@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+
+from distutils.core import setup
+
+setup(name='passlocker',
+      version='0.0.1',
+      description='Password Encryption',
+      author='Chris Lee',
+      author_email='python@chrisleephd.us',
+      url='https://github.com/chrislee35/passlocker',
+      packages=['passlocker'],
+      scripts=['bin/passlocker'],
+      install_requires = ['pycrypto'],
+      classifiers=[
+              "Development Status :: 3 - Alpha",
+              "Topic :: Utilities",
+              "License :: OSI Approved :: MIT License",
+          ],
+      
+     )
