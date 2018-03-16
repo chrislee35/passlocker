@@ -5,10 +5,12 @@ import argparse
 import configparser
 import os, sys
 from binascii import unhexlify
+from pprint import pprint
 
 password = None
 dbdir = '%s/.passlocker' % os.environ['HOME']
 pl = None
+words = list()
 
 supported_verbs = {
   'setup': 'display, initialize, or change the configuration',
@@ -57,9 +59,9 @@ def help(progname, cmd=None):
 """)
   
 def next_word():
-  if len(sys.argv) == 0:
+  if len(words) == 0:
     return None
-  return sys.argv.pop(0)
+  return words.pop(0)
   
 def pl_prompt(message, default, options=None):
   while True:
@@ -80,7 +82,7 @@ def pl_prompt(message, default, options=None):
 def list_accounts():
   accs = pl.list_accounts()
   for acc in accs:
-    print(acc)
+    print(acc.decode('UTF-8'))
   
 def account_info():
   accname = next_word()
@@ -92,13 +94,7 @@ def account_info():
     accname = accname.encode('UTF-8')
   
   acc = pl._load_account(accname)
-  print(""""{
-    "account": "{account_name}",
-    "username" : "{username}",
-    "created_on" : "{created_on}",
-    "password.active" : "{password.active}",
-    "type" : "{type}"
-}""".format(acc))
+  pprint(acc)
 
 def get_password():
   accname = next_word()
@@ -110,6 +106,7 @@ def get_password():
     accname = accname.encode('UTF-8')
     
   pw = pl.get_active_password(accname)
+  print(pw.decode('UTF-8'))
   
 def add_account():
   accname = next_word()
@@ -239,27 +236,51 @@ def add_password():
       pl.add_password(account_name, secret)
    
 
-progname = next_word()
-if len(sys.argv) == 0:
-  help(progname)
+def process():
+  cmd = next_word()
+  if cmd == "list":
+    list_accounts()
+  elif cmd == "info":
+    account_info()
+  elif cmd == "get":
+    get_password()
+  elif cmd == "add":
+    add_account()
+  elif cmd == "pw":
+    add_password()
+  elif cmd == "help":
+    help("interactive")
+  else:
+    print("Unknown command: %s" % cmd)
+
+if len(sys.argv) == 1:
+  help(sys.argv[0])
   sys.exit(0)
 
-cmd = next_word()
+words = sys.argv[1:]
+cmd = words[0]
 if cmd == "help":
-  help(progname, sys.argv)
+  help(sys.argv[0], sys.argv)
   sys.exit(0)
 
 password = getpass.getpass(prompt="Master password: ")
 pl = PassLocker(password)
 
-if cmd == "list":
-  list_accounts()
-elif cmd == "info":
-  account_info()
-elif cmd == "get":
-  get_password()
-elif cmd == "add":
-  add_account()
-elif cmd == "pw":
-  add_password()
+if cmd == "interactive":
+  import csv
+  while True:
+    try:
+      line = input("> ")
+      if line == None or line == "exit" or line == "quit":
+        sys.exit(0)
+      words = csv.reader([line], delimiter=' ').__next__()
+      process()
+    except EOFError as e:
+      print("")
+      sys.exit(0)
+    except Exception as e:
+      print(e)
+else:
+  process()
+  
     
