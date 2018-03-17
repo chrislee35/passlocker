@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import base64
+from base64 import b64encode as b64encode
+from base64 import b64decode as b64decode
 import json
 import sys, os
 import time
 import glob
+from pprint import pprint
 
 try:
     import Crypto
@@ -19,33 +22,115 @@ from Crypto import Random
 BAD_HMAC = 1
 BAD_ARGS = 2
 
+def b64d(s):
+  return b64decode(s.encode('UTF-8'))
+  
+def b64e(b):
+  return b64encode(b).decode('UTF-8')
+
 class PassLocker:
   def __init__(self, master_password, **kwargs):
-    self.master_password = master_password
     self.dbdir = kwargs.get('dbdir', os.environ['HOME']+"/.passlocker")
     self.iterations = kwargs.get('iterations', 100000)
     if not os.path.exists(self.dbdir):
       os.mkdir(self.dbdir)
-    check = SHA256.new(b'this is a poor seed'+master_password.encode('UTF-8'))
     checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
+    self.unlocked = False
+    if type(master_password) == str:
+      master_password = master_password.encode('UTF-8')
     if os.path.exists(checkfile):
-      fh = open(checkfile, 'rb')
-      answer = fh.read()
-      fh.close()
-      if answer != check.digest():
-        raise Exception("Master password is incorrect.")
+      self._check_master_password(checkfile, master_password)
     else:
-      fh = open(checkfile, 'wb')
-      fh.write(check.digest())
-      fh.close()
+      self._initialize_master_password(checkfile, master_password)
+      
+  def _check_master_password(self, checkfile, master_password):
+    fh = open(checkfile, 'r')
+    master = json.load(fh)
+    fh.close()
+    
+    salt = b64d(master['salt'])
+    iterations = master['iterations']
+    
+    # derive from the password the master-key-decryption-key 
+    # (and the password-derived hmac), decrypt the master-key (and master-hmac)
+    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, salt=salt, iterations=iterations)
+    hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
+    if master['hmac'] != hmac:
+      raise Exception("Master password is incorrect.")
+      
+    self.unlocked = True
+    ciphertext = b64d(master['ciphertext'])
+    iv = b64d(master['iv'])
+    
+    plaintext = PassLocker.decrypt(ciphertext, aes_key, iv)
+    self.aes_key = plaintext[0:16]
+    self.hmac_key = plaintext[16:32]
+      
+  def _initialize_master_password(self, checkfile, master_password):
+    if len(master_password) < 20:
+      print("Your password is less than 20 characters.  To proceed with this week password, please type: weak password")
+      ans = input("> ")
+      if ans.strip().lower() != "weak password":
+        sys.exit(0)
+        
+    # Take the master password, derive the master-key-encryption-key from it
+    # Then encrypt the master key with the password-derived key
+    # Do the same with the hmac
+    
+    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, iterations=self.iterations)
+    hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
+    self.aes_key = Random.new().read(16)
+    self.hmac_key = Random.new().read(16)
+    ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
+    master = {
+      "algorithm" : "aes-256-cbc",
+      'salt' : b64e(salt),
+      'iterations' : iterations,
+      'hmac' : hmac, # this comes out as a hex string
+      'ciphertext' : b64e(ciphertext),
+      'iv' : b64e(iv)
+    }
+    fh = open(checkfile, 'w')
+    json.dump(master, fh)
+    fh.close()
+    self.unlocked = True
+    
+  def change_master_password(self, new_password):
+    if not self.unlocked:
+      raise Exception("Cannot change the password on a locked database.")
+    
+    if len(new_password) < 20:
+      print("Your password is less than 20 characters.  To proceed with this week password, please type: weak password")
+      ans = input("> ")
+      if ans.strip().lower() != "weak password":
+        sys.exit(0)
+        
+    # Take the master password, derive the master-key-encryption-key from it
+    # Then encrypt the master key with the password-derived key
+    # Do the same with the hmac
+    
+    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(new_password, iterations=self.iterations)
+    hmac = PassLocker.make_hmac(new_password+aes_key, hmac_key)
+    ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
+    master = {
+      "algorithm" : "aes-256-cbc",
+      'salt' : b64e(salt),
+      'iterations' : iterations,
+      'hmac' : hmac, # this comes out as a hex string
+      'ciphertext' : b64e(ciphertext),
+      'iv' : b64e(iv)
+    }
+    fh = open(checkfile, 'w')
+    json.dump(master, fh)
+    fh.close()
     
   def list_accounts(self):
-    return [base64.b64decode(x.split('/')[-1][0:-5]) for x in glob.glob('%s/*.json' % self.dbdir)]
+    return [b64d(x.split('/')[-1][0:-5]) for x in glob.glob('%s/*.json' % self.dbdir)]
     
   def _to_db(self, account):
     if type(account) == str:
       account = account.encode('UTF-8')
-    return "%s/%s.json" % (self.dbdir, base64.b64encode(account).decode('UTF-8'))
+    return "%s/%s.json" % (self.dbdir, b64e(account))
     
   def _load_account(self, account_name):
     account_file = self._to_db(account_name)
@@ -66,8 +151,7 @@ class PassLocker:
     fh = open(account_file, "w")
     json.dump(account, fh)
     fh.close()
-    
-    
+      
   # From https://bitbucket.org/brendanlong/python-encryption/src/1737e959fa307d84a5dcf96c4139b1d91a08b2e9/encryption.py?at=master&fileviewer=file-view-default
   @staticmethod
   def make_keys(password, salt=None, iterations=100000):
@@ -155,17 +239,14 @@ class PassLocker:
   def add_password(self, account_name, password):
     acc = self._load_account(account_name)
   
-    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(self.master_password, iterations=self.iterations)
-    ciphertext, iv = PassLocker.encrypt(password, aes_key)
-    hmac = PassLocker.make_hmac(ciphertext, hmac_key)
+    ciphertext, iv = PassLocker.encrypt(password, self.aes_key)
+    hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
   
     pw_entry = {
       "added_on" : time.strftime("%Y-%m-%d"),
       "algorithm" : "aes-256-cbc",
-      "ciphertext" : base64.b64encode(ciphertext).decode("utf-8"),
-      "iv" : base64.b64encode(iv).decode("utf-8"),
-      "salt" : base64.b64encode(salt).decode("utf-8"),
-      "iterations" : iterations,
+      "ciphertext" : b64e(ciphertext),
+      "iv" : b64e(iv),
       "hmac" : hmac
     }
        
@@ -188,17 +269,14 @@ class PassLocker:
       raise Exception("All passwords on this account have been used. No valid passwords remain.")
     
     password = acc['passwords'][pa - 1]
-    ciphertext = base64.b64decode(password['ciphertext'])
-    salt = base64.b64decode(password['salt'])
-    iv = base64.b64decode(password["iv"])
-    iterations = password["iterations"]
+    ciphertext = b64d(password['ciphertext'])
+    iv = b64d(password["iv"])
 
-    aes_key, hmac_key, _, _ = PassLocker.make_keys(self.master_password, salt, iterations)
-    hmac = PassLocker.make_hmac(ciphertext, hmac_key)
+    hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
     if hmac != password['hmac']:
       raise Exception("HMAC verification of encrypted password failed.")
   
-    output_data = PassLocker.decrypt(ciphertext, aes_key, iv)
+    output_data = PassLocker.decrypt(ciphertext, self.aes_key, iv)
     skip = acc.get('password.skip', 0)
     if skip != 0:
       self.set_active_password(account_name, pa + skip)

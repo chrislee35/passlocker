@@ -1,20 +1,21 @@
-import unittest, os
+import unittest, os, glob
 from passlocker import PassLocker
 
 class PassLockerTest(unittest.TestCase):
   def setUp(self):
-    for acc in ['test', 'otp_test', 'totp_test']:
-      if os.path.exists('db/%s.json' % acc):
-        os.unlink('db/%s.json' % acc)
+    for acc in glob.glob('db/*.json'):
+      os.unlink(acc)
+    if os.path.exists('db/.check'):
+      os.unlink('db/.check')
     
   def test_regular_password(self):
-    pl = PassLocker("master", iterations=10) # for testing
+    pl = PassLocker("mastermastermastermaster", iterations=10, dbdir='db/') # for testing
     pl.add_account("test", "chris")
     pl.add_password("test", b"password")
     self.assertEqual(b"password", pl.get_active_password("test"))
     
   def test_otp(self):
-    pl = PassLocker("master", iterations=10) # for testing
+    pl = PassLocker("mastermastermastermaster", iterations=10, dbdir='db/') # for testing
     pl.add_otp_account("otp_test", [b"a",b"b",b"c",b"d",b"e",b"f"])
     self.assertEqual(b"a", pl.get_active_password("otp_test"))
     self.assertEqual(b"b", pl.get_active_password("otp_test"))
@@ -26,7 +27,7 @@ class PassLockerTest(unittest.TestCase):
       pl.get_active_password("otp_test")
 
   def test_totp(self):
-    pl = PassLocker("master", iterations=10) # for testing
+    pl = PassLocker("mastermastermastermaster", iterations=10, dbdir='db/') # for testing
     key = "12345678901234567890".encode('UTF-8')
     pl.add_totp_account("totp_test", key, num_digits=8, time_interval=30)
     answers = ["94287082", "07081804", "14050471", "89005924", "69279037", "65353130"]
@@ -36,9 +37,10 @@ class PassLockerTest(unittest.TestCase):
       self.assertEqual(answer, result)
 
   def tearDown(self):
-    for acc in ['test', 'otp_test', 'totp_test']:
-      if os.path.exists('db/%s.json' % acc):
-        os.unlink('db/%s.json' % acc)
+    for acc in glob.glob('db/*.json'):
+      os.unlink(acc)
+    if os.path.exists('db/.check'):
+      os.unlink('db/.check')
 
 if __name__ == '__main__':
   unittest.main()
