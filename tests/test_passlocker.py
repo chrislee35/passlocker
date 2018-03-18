@@ -58,7 +58,9 @@ class PassLockerTest(unittest.TestCase):
     pl.add_question("test", "city of first kiss", "mossville")
     answer = ["name of dog", "name of cat", "city of first kiss"]
     self.assertEqual(answer, pl.list_questions("test"))
-    self.assertEqual("pansalot", pl.get_answer("test", 1))
+    self.assertEqual("jack", pl.get_answer("test", 0))
+    self.assertEqual("pantsalot", pl.get_answer("test", 1))
+    self.assertEqual("mossville", pl.get_answer("test", 2))
     
   def test_notes(self):
     pl = PassLocker("mastermastermastermaster", iterations=10, dbdir='db/') # for testing
@@ -68,8 +70,6 @@ class PassLockerTest(unittest.TestCase):
     answer = [ "this is a note", "this is another note" ]
     self.assertEqual(answer, pl.get_notes("test"))
     
-    
-
   def tearDown(self):
     for acc in glob.glob('db/*.json'):
       os.unlink(acc)

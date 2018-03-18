@@ -236,8 +236,15 @@ class PassLocker:
     self._write_account(account_name, acc, overwrite=False)
     return acc
   
-  def add_password(self, account_name, password):
+  def add_password(self, account_name, password, encoding='UTF-8'):
     acc = self._load_account(account_name)
+    
+    if type(password) == str:
+      password = password.encode(encoding)
+    elif type(password) == bytes:
+      encoding = 'bytes'
+    else:
+      raise Exception("I don't know how to encrypt a password of type %s" % type(pasword))
   
     ciphertext, iv = PassLocker.encrypt(password, self.aes_key)
     hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
@@ -247,7 +254,8 @@ class PassLocker:
       "algorithm" : "aes-256-cbc",
       "ciphertext" : b64e(ciphertext),
       "iv" : b64e(iv),
-      "hmac" : hmac
+      "hmac" : hmac,
+      "encoding" : encoding
     }
        
     if acc.get('passwords') == None:
@@ -277,6 +285,9 @@ class PassLocker:
       raise Exception("HMAC verification of encrypted password failed.")
   
     output_data = PassLocker.decrypt(ciphertext, self.aes_key, iv)
+    if password['encoding'] != 'bytes':
+      output_data.decode(password['encoding'])
+      
     skip = acc.get('password.skip', 0)
     if skip != 0:
       self.set_active_password(account_name, pa + skip)
@@ -341,18 +352,23 @@ class PassLocker:
   def set_user(self, account_name, user):
     # users are plain text (for now.  I might change this in the future)
     acc = self._load_account(account_name)
-    acc['user'] = user
+    acc['username'] = user
     self._write_account(account_name, acc)
     
   def get_user(self, account_name):
-    return self._load_account(account_name).get('user')
+    return self._load_account(account_name).get('username')
     
   def list_notes(self, account_name):
     acc = self._load_account(account_name)
     return acc.get('notes', [])
     
-  def add_question(self, account_name, question, answer):
+  def add_question(self, account_name, question, answer, encoding = 'UTF-8'):
     acc = self._load_account(account_name)
+    if type(answer) == str:
+      answer = answer.encode(encoding)
+    elif type(answer) == bytes:
+      encoding = 'bytes'
+      
     ciphertext, iv = PassLocker.encrypt(answer, self.aes_key)
     hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
   
@@ -362,9 +378,10 @@ class PassLocker:
       "algorithm" : "aes-256-cbc",
       "ciphertext" : b64e(ciphertext),
       "iv" : b64e(iv),
+      "encoding" : encoding,
       "hmac" : hmac
     }
-       
+    
     if acc.get('questions') == None:
       acc['questions'] = []
     
@@ -393,6 +410,9 @@ class PassLocker:
       raise Exception("HMAC verification of encrypted password failed.")
   
     output_data = PassLocker.decrypt(ciphertext, self.aes_key, iv)
+    if q_entry['encoding'] != 'bytes':
+      output_data = output_data.decode(q_entry['encoding'])
+    return output_data
     
     
     
