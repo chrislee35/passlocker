@@ -300,6 +300,9 @@ class PassLocker:
       binary = ((output[offset] & 0x7f) << 24) | ((output[offset + 1] & 0xff) << 16) | ((output[offset + 2] & 0xff) << 8) | (output[offset + 3] & 0xff)
       
       output_data = str(binary)[-acc['num_digits']:]
+      
+    if kwargs.get('decode'):
+      output_data = output_data.decode(kwargs['decode'])
         
     return output_data
     
@@ -320,3 +323,77 @@ class PassLocker:
     kwargs['type'] = 'totp'
     self.add_account(account_name, None, **kwargs)
     self.add_password(account_name, secret)
+    
+  def add_note(self, account_name, note):
+    # notes are plain text
+    acc = self._load_account(account_name)
+    if acc.get('notes') == None:
+      acc['notes'] = list()
+    acc['notes'].append(note)
+    self._write_account(account_name, acc)
+    
+  def get_notes(self, account_name):
+    acc = self._load_account(account_name)
+    if acc.get('notes') == None:
+      return []
+    return acc.get('notes')
+    
+  def set_user(self, account_name, user):
+    # users are plain text (for now.  I might change this in the future)
+    acc = self._load_account(account_name)
+    acc['user'] = user
+    self._write_account(account_name, acc)
+    
+  def get_user(self, account_name):
+    return self._load_account(account_name).get('user')
+    
+  def list_notes(self, account_name):
+    acc = self._load_account(account_name)
+    return acc.get('notes', [])
+    
+  def add_question(self, account_name, question, answer):
+    acc = self._load_account(account_name)
+    ciphertext, iv = PassLocker.encrypt(answer, self.aes_key)
+    hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
+  
+    q_entry = {
+      "question" : question,
+      "added_on" : time.strftime("%Y-%m-%d"),
+      "algorithm" : "aes-256-cbc",
+      "ciphertext" : b64e(ciphertext),
+      "iv" : b64e(iv),
+      "hmac" : hmac
+    }
+       
+    if acc.get('questions') == None:
+      acc['questions'] = []
+    
+    acc['questions'].append(q_entry)
+    self._write_account(account_name, acc)
+    
+  def list_questions(self, account_name):
+    acc = self._load_account(account_name)
+    if acc.get('questions') == None:
+      return []
+    return( [ x['question'] for x in acc['questions'] ] )
+    
+  def get_answer(self, account_name, idx):
+    acc = self._load_account(account_name)
+    if acc.get('questions') == None:
+      return None
+    if idx >= len(acc['questions']):
+      return None
+    q_entry = acc['questions'][idx]
+    
+    ciphertext = b64d(q_entry['ciphertext'])
+    iv = b64d(q_entry["iv"])
+
+    hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)
+    if hmac != q_entry['hmac']:
+      raise Exception("HMAC verification of encrypted password failed.")
+  
+    output_data = PassLocker.decrypt(ciphertext, self.aes_key, iv)
+    
+    
+    
+    
