@@ -3,9 +3,8 @@ from passlocker import PassLocker
 import getpass
 import argparse
 import configparser
-import os, sys
+import os, sys, base64
 from binascii import unhexlify
-from pprint import pprint
 
 password = None
 dbdir = '%s/.passlocker' % os.environ['HOME']
@@ -56,12 +55,34 @@ def help(progname, cmd=None):
 #  it will prompt for the password if no file is specified
 # passlocker pw "otp account" [raw|hex|b64] [file <filename>]
 # passlocker pw "totp account" [raw|hex|b64] [file <filename>]
+# passlocker interactive
+# passlocker script <filename>
 """)
-  
-def next_word():
+
+previous_encoding = 'raw'
+
+def next_word(use_previous_encoding=False):
   if len(words) == 0:
     return None
-  return words.pop(0)
+  word = words.pop(0)
+  if word in ['hex', 'b64', 'raw']:
+    previous_encoding = word
+    return dec(words.pop(0), word)
+  elif use_previous_encoding:
+    return dec(word, previous_encoding)
+  else:
+    return word
+  
+def dec(item, encoding='raw'):
+  if encoding == 'hex':
+    return unhexlify(item)
+  elif encoding == 'b64':
+    return base64.b64decode(item)
+  elif encoding == 'raw':
+    return item.encode('UTF-8')
+  elif encoding == 'bytes':
+    return item
+  return item
   
 def pl_prompt(message, default, options=None):
   while True:
@@ -81,131 +102,98 @@ def pl_prompt(message, default, options=None):
 
 def list_accounts():
   accs = pl.list_accounts()
+  filt = next_word()
+  if filt:
+    accs = [ x for x in accs if filt in str(x) ]
   for acc in accs:
     print(acc.decode('UTF-8'))
   
 def account_info():
   accname = next_word()
-  if accname == 'hex':
-    accname = unhexlify(next_word())
-  elif accname == 'b64':
-    accname = base64.b64decode(next_word())
-  elif accname == 'raw':
-    accname = accname.encode('UTF-8')
-  
-  acc = pl._load_account(accname)
-  pprint(acc)
+  username = next_word()
+  acc = pl._load_account(accname, username)
+  #pprint(acc)
 
 def get_password():
-  accname = next_word()
-  if accname == 'hex':
-    accname = unhexlify(next_word())
-  elif accname == 'b64':
-    accname = base64.b64decode(next_word())
-  elif accname == 'raw':
-    accname = accname.encode('UTF-8')
-    
-  pw = pl.get_active_password(accname)
+  accname = next_word() 
+  username = next_word()
+  pw = pl.get_active_password(accname, username)
   print(pw.decode('UTF-8'))
   
-def add_account():
-  accname = next_word()
-  if accname == 'hex':
-    accname = unhexlify(next_word())
-  elif accname == 'b64':
-    accname = base64.b64decode(next_word())
-  elif accname == 'raw':
-    accname = accname.encode('UTF-8')
-    
-  acctype = next_word()
-  if not acctype in ["password", "otp", "totp"]:
-    raise Exception("Supported account types are 'password', 'otp', 'totp'.")
-    
-  username = None
+def add_password_account():
+  accname = next_word()    
+  username = next_word()
+  pl.add_account(accname, username, type='password')
+  
+def add_otp_account():  
+  accname = next_word()    
+  username = next_word()
+  pl.add_account(accname, username, type='otp')
 
-  if acctype == "totp":
-    word = next_word()
-    if word == None:
-      epoch_start = pl_prompt('Start time (epoch seconds)', 0)
-    else:
-      epoch_start = int(word)
-    word = next_word()
-    if word == None:
-      time_interval = pl_prompt('Time interval (seconds)', 30)
-    else:
-      time_interval = int(word)
-    word = next_word()
-    if word == None:
-      num_digits = pl_prompt('Number of digits to return', 6)
-    else:
-      num_digits = int(word)
-    word = next_word()
-    if word == None or not word in ['sha1', 'md5', 'sha256']:
-      hash_algorithm = pl_prompt('Which hash algorithm to use', 'sha1', ['sha1', 'md5', 'sha256'])
-    else:
-      hash_algorithm = word
-      
-    pl.add_account(accname, username, type=acctype, 
-      epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
-      hash_algorithm=hash_algorithm)
+def add_totp_account():
+  accname = next_word()    
+  username = next_word()
+  word = next_word()
+  if word == None:
+    epoch_start = pl_prompt('Start time (epoch seconds)', 0)
   else:
-    pl.add_account(accname, username, type=acctype)
+    epoch_start = int(word)
+  word = next_word()
+  if word == None:
+    time_interval = pl_prompt('Time interval (seconds)', 30)
+  else:
+    time_interval = int(word)
+  word = next_word()
+  if word == None:
+    num_digits = pl_prompt('Number of digits to return', 6)
+  else:
+    num_digits = int(word)
+  word = next_word()
+  if word == None or not word in ['sha1', 'md5', 'sha256']:
+    hash_algorithm = pl_prompt('Which hash algorithm to use', 'sha1', ['sha1', 'md5', 'sha256'])
+  else:
+    hash_algorithm = word
+    
+  pl.add_account(accname, username, type=acctype, 
+    epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
+    hash_algorithm=hash_algorithm)    
  
 def add_password():
   accname = next_word()
-  if accname == 'hex':
-    accname = unhexlify(next_word())
-  elif accname == 'b64':
-    accname = base64.b64decode(next_word())
-  elif accname == 'raw':
-    accname = accname.encode('UTF-8')
-
-  acc = pl._load_account(accname)
+  username = next_word()
+  acc = pl._load_account(accname, username)
   
-  encoding = 'raw'
-  word = next_word()
-  if word == 'raw':
-    encoding = 'raw'
-  elif word == 'b64':
-    encoding = 'b64'
-  elif word == 'hex':
-    encoding = 'hex'
-  elif word == None:
-    encoding = 'raw'
-  else:
-    raise Exception("Unknown password encoding: %s" % word)
-  
-  word = next_word()
   passwords = list()
-  if word == "file":
+  password = next_word()
+  if password == 'file':
     filename = next_word()
     fh = open(filename, 'r')
     passwords = fh.read().split('\n')
     fh.close()
+  else:
+    passwords.append(password)
+    password = next_word(True)
+    while password:
+      passwords.append(password)
+      password = next_word(True)
   
   if acc['type'] == 'password':
     if len(passwords) > 0:
       for password in passwords:
-        pl.add_password(accname, password)
+        pl.add_password(accname, username, password)
     else:
       password = getpass.getpass('Enter password for account, %s (%s): ' % (accname, encoding))
       if password == None or password == "":
         sys.exit(0)
-      if encoding == 'hex':
-        password = unhexlify(password)
-      elif encoding == 'b64':
-        password = base64.b64decode(password)
-      pl.add_password(accname, password)
+      password = dec(password, encoding)
+      pl.add_password(accname, username, password)
   elif acc['type'] == 'otp':
     index = 1
     if len(passwords) == 0:
       print("Enter OTP passwords, one per line using %s encoding.  Use an empty line to finish." % encoding)
       password = getpass.getpass('%d: ' % index)
       while password != None and password != "":
-        if encoding == 'hex':
-          password = unhexlify(password)
-        elif encoding == 'b64':
-          password = base64.b64decode(password)
+        password = dec(password, encoding)
         passwords.append(password)
         index += 1
         password = getpass.getpass('%d: ' % index)
@@ -213,29 +201,35 @@ def add_password():
       if len(passwords) > 3:
         print("Please be patient.  Encrypting many passwords will take time.")
       for password in passwords:
-        if encoding == 'hex':
-          password = unhexlify(password)
-        elif encoding == 'b64':
-          password = base64.b64decode(password)
-        pl.add_password(accname, password)
+        password = dec(password, encoding)
+        pl.add_password(accname, username, password)
       pl.set_active_password(accname, 1, skip=1)
   elif acc['type'] == 'totp':
     if len(passwords) > 0:
       for password in passwords:
-        if encoding == 'hex':
-          password = unhexlify(password)
-        elif encoding == 'b64':
-          password = base64.b64decode(password)
-        pl.add_password(account_name, password)
+        password = dec(password, encoding)
+        pl.add_password(account_name, username, password)
     else:
       password = getpass.getpass('Enter secret for TOTP account, %s (%s): ' % (accname, encoding))
-      if encoding == 'hex':
-        password = unhexlify(password)
-      elif encoding == 'b64':
-        password = base64.b64decode(password)
-      pl.add_password(account_name, secret)
+      password = dec(password, encoding)
+      pl.add_password(account_name, username, secret)
    
+def set_user():
+  accname = next_word()
+  user = next_word()
+  if user == None:
+    user = input("Username: ")
+  pl.set_user(accname, user)
 
+def add_note():
+  accname = next_word()
+  note = next_word()
+  if note == None:
+    note = input("Note: ")
+  if note == None or len(note) == 0:
+    return
+  pl.add_note(accname, note)
+  
 def process():
   cmd = next_word()
   if cmd == "list":
@@ -245,9 +239,25 @@ def process():
   elif cmd == "get":
     get_password()
   elif cmd == "add":
-    add_account()
+    try:
+      acctype = next_word()
+      if acctype == "password":
+        add_password_account()
+      elif acctype == "otp":
+        add_otp_account()
+      elif acctype == "totp":
+        add_totp_account()
+      else:
+        help()
+        sys.exit(0)
+    except Exception as e:
+      print(e)
   elif cmd == "pw":
     add_password()
+  elif cmd == "user":
+    set_user()
+  elif cmd == "note":
+    add_note()
   elif cmd == "help":
     help("interactive")
   else:
@@ -278,8 +288,14 @@ if cmd == "interactive":
     except EOFError as e:
       print("")
       sys.exit(0)
-    #except Exception as e:
-    #  print(e)
+elif cmd == "script":
+  import csv
+  next_word()
+  filename = next_word()
+  with open(filename, 'r') as csvfile:
+    script_reader = csv.reader(csvfile, delimiter=' ', quotechar='"')
+    for words in script_reader:
+      process()
 else:
   process()
   

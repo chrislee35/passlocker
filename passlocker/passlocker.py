@@ -6,7 +6,6 @@ import json
 import sys, os
 import time
 import glob
-from pprint import pprint
 
 try:
     import Crypto
@@ -125,15 +124,20 @@ class PassLocker:
     fh.close()
     
   def list_accounts(self):
-    return [b64d(x.split('/')[-1][0:-5]) for x in glob.glob('%s/*.json' % self.dbdir)]
+    accounts = [ b64d(x.split('/')[-1][0:-5]) 
+      for x in glob.glob('%s/*.json' % self.dbdir) ]
+    return accounts
     
-  def _to_db(self, account):
+  def _to_db(self, account, username):
     if type(account) == str:
       account = account.encode('UTF-8')
-    return "%s/%s.json" % (self.dbdir, b64e(account))
+    if type(username) == str:
+      username = username.encode('UTF-8')
+    key = account+b'|'+username
+    return "%s/%s.json" % (self.dbdir, b64e(key))
     
-  def _load_account(self, account_name):
-    account_file = self._to_db(account_name)
+  def _load_account(self, account_name, username):
+    account_file = self._to_db(account_name, username)
     if not os.path.exists(account_file):
       raise Exception("Cannot find entry for %s" % account_name)
   
@@ -143,14 +147,21 @@ class PassLocker:
     
     return acc
     
-  def _write_account(self, account_name, account, **kwargs):
-    account_file = self._to_db(account_name)
+  def _write_account(self, account, **kwargs):
+    account_name = account['account']
+    account_file = self._to_db(account_name, account['username'])
     if kwargs.get('overwrite', True) == False and os.path.exists(account_file):
-      raise Exception("Entry for %s already exists" % account_name)
+      raise Exception("Entry for %s (%s) already exists" % (account_name, account['username']))
   
     fh = open(account_file, "w")
     json.dump(account, fh)
     fh.close()
+    
+  def _unlink_account(self, account_name, username):
+    account_file = self._to_db(account_name, username)
+    if not os.path.exists(account_file):
+      raise Exception("Cannot find entry for %s" % account_name)
+    os.unlink(account_file)
       
   # From https://bitbucket.org/brendanlong/python-encryption/src/1737e959fa307d84a5dcf96c4139b1d91a08b2e9/encryption.py?at=master&fileviewer=file-view-default
   @staticmethod
@@ -233,11 +244,11 @@ class PassLocker:
       acc['num_digits'] = kwargs.get('num_digits', 6)
       acc['hash_algorithm'] = kwargs.get('hash_algorithm', 'sha1')
       
-    self._write_account(account_name, acc, overwrite=False)
+    self._write_account(acc, overwrite=False)
     return acc
   
-  def add_password(self, account_name, password, encoding='UTF-8'):
-    acc = self._load_account(account_name)
+  def add_password(self, account_name, username, password, encoding='UTF-8'):
+    acc = self._load_account(account_name, username)
     
     if type(password) == str:
       password = password.encode(encoding)
@@ -264,10 +275,10 @@ class PassLocker:
     acc['passwords'].append(pw_entry)
     acc['password.active'] = len(acc['passwords'])
   
-    self._write_account(account_name, acc)
+    self._write_account(acc)
 
-  def get_active_password(self, account_name, **kwargs):
-    acc = self._load_account(account_name)
+  def get_active_password(self, account_name, username, **kwargs):
+    acc = self._load_account(account_name, username)
 
     pa = acc.get('password.active')
     if pa == 0:
@@ -290,7 +301,7 @@ class PassLocker:
       
     skip = acc.get('password.skip', 0)
     if skip != 0:
-      self.set_active_password(account_name, pa + skip)
+      self.set_active_password(account_name, username, pa + skip)
       
     if acc['type'] == 'totp':
       now = kwargs.get('now', time.time())
@@ -317,53 +328,56 @@ class PassLocker:
         
     return output_data
     
-  def set_active_password(self, account_name, active_password, **kwargs):
-    acc = self._load_account(account_name)
+  def set_active_password(self, account_name, username, active_password, **kwargs):
+    acc = self._load_account(account_name, username)
     acc['password.active'] = active_password
     if kwargs.get('skip'):
       acc['password.skip'] = kwargs.get('skip')
-    self._write_account(account_name, acc)
+    self._write_account(acc)
     
-  def add_otp_account(self, account_name, passwords):
-    self.add_account(account_name, None, type='otp')
+  def add_otp_account(self, account_name, username, passwords):
+    self.add_account(account_name, username, type='otp')
     for pw in passwords:
-      self.add_password(account_name, pw)
-    self.set_active_password(account_name, 1, skip=1)
+      self.add_password(account_name, username, pw)
+    self.set_active_password(account_name, username, 1, skip=1)
     
-  def add_totp_account(self, account_name, secret, **kwargs):
+  def add_totp_account(self, account_name, username, secret, **kwargs):
     kwargs['type'] = 'totp'
-    self.add_account(account_name, None, **kwargs)
-    self.add_password(account_name, secret)
+    self.add_account(account_name, username, **kwargs)
+    self.add_password(account_name, username, secret)
     
-  def add_note(self, account_name, note):
+  def add_note(self, account_name, username, note):
     # notes are plain text
-    acc = self._load_account(account_name)
+    acc = self._load_account(account_name, username)
     if acc.get('notes') == None:
       acc['notes'] = list()
     acc['notes'].append(note)
-    self._write_account(account_name, acc)
+    self._write_account(acc)
     
-  def get_notes(self, account_name):
-    acc = self._load_account(account_name)
+  def get_notes(self, account_name, username):
+    acc = self._load_account(account_name, username)
     if acc.get('notes') == None:
       return []
     return acc.get('notes')
     
-  def set_user(self, account_name, user):
+  def change_user(self, account_name, from_user, to_user):
     # users are plain text (for now.  I might change this in the future)
-    acc = self._load_account(account_name)
-    acc['username'] = user
-    self._write_account(account_name, acc)
+    acc = self._load_account(account_name, from_user)
+    if type(to_user) == bytes:
+      to_user = to_user.decode('UTF-8')
+    acc['username'] = to_user
+    self._write_account(acc)
+    self._unlink_account(account_name, from_user)
     
-  def get_user(self, account_name):
-    return self._load_account(account_name).get('username')
+  def get_user(self, account_name, username):
+    return self._load_account(account_name, username).get('username')
     
-  def list_notes(self, account_name):
-    acc = self._load_account(account_name)
+  def list_notes(self, account_name, username):
+    acc = self._load_account(account_name, username)
     return acc.get('notes', [])
     
-  def add_question(self, account_name, question, answer, encoding = 'UTF-8'):
-    acc = self._load_account(account_name)
+  def add_question(self, account_name, username, question, answer, encoding = 'UTF-8'):
+    acc = self._load_account(account_name, username)
     if type(answer) == str:
       answer = answer.encode(encoding)
     elif type(answer) == bytes:
@@ -386,16 +400,16 @@ class PassLocker:
       acc['questions'] = []
     
     acc['questions'].append(q_entry)
-    self._write_account(account_name, acc)
+    self._write_account(acc)
     
-  def list_questions(self, account_name):
-    acc = self._load_account(account_name)
+  def list_questions(self, account_name, username):
+    acc = self._load_account(account_name, username)
     if acc.get('questions') == None:
       return []
     return( [ x['question'] for x in acc['questions'] ] )
     
-  def get_answer(self, account_name, idx):
-    acc = self._load_account(account_name)
+  def get_answer(self, account_name, username, idx):
+    acc = self._load_account(account_name, username)
     if acc.get('questions') == None:
       return None
     if idx >= len(acc['questions']):
