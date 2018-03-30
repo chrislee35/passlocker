@@ -157,7 +157,20 @@ def add_totp_account():
   pl.add_account(accname, username, type=acctype, 
     epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
     hash_algorithm=hash_algorithm)    
- 
+
+def del_account():
+  accname = next_word()    
+  username = next_word()
+  confirm = next_word()
+  if confirm == None:
+    confirm = pl_prompt('Delete account (yes|no)', 'no')
+  if confirm and confirm.lower() == 'yes':
+    deleted = pl.del_account(accname, username)
+    if deleted:
+      print("Account, {accname}, deleted.".format(accname=accname))
+    else:
+      print("Cound not delete {accname}".format(accname=accname))
+   
 def add_password():
   accname = next_word()
   username = next_word()
@@ -229,6 +242,14 @@ def add_note():
   if note == None or len(note) == 0:
     return
   pl.add_note(accname, note)
+
+def change_password():
+  new_password = getpass.getpass(prompt="New master password: ")
+  verify = getpass.getpass(prompt="Verify new password: ")
+  if new_password == verify:
+    pl.change_master_password(new_password)
+  else:
+    print("Passwords did not match.")
   
 def process():
   cmd = next_word()
@@ -252,12 +273,16 @@ def process():
         sys.exit(0)
     except Exception as e:
       print(e)
+  elif cmd == "del":
+    del_account()
   elif cmd == "pw":
     add_password()
   elif cmd == "user":
     set_user()
   elif cmd == "note":
     add_note()
+  elif cmd == "chgpass":
+    change_password()
   elif cmd == "help":
     help("interactive")
   else:

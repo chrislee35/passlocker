@@ -6,6 +6,7 @@ import json
 import sys, os
 import time
 import glob
+import getpass
 
 try:
     import Crypto
@@ -71,6 +72,10 @@ class PassLocker:
       ans = input("> ")
       if ans.strip().lower() != "weak password":
         sys.exit(0)
+    verify = getpass.getpass("Verify password: ")
+    if verify != master_password:
+      print("Passwords do not match. Bailing out.")
+      sys.exit(0)
         
     # Take the master password, derive the master-key-encryption-key from it
     # Then encrypt the master key with the password-derived key
@@ -93,40 +98,6 @@ class PassLocker:
     json.dump(master, fh)
     fh.close()
     self.unlocked = True
-    
-  def change_master_password(self, new_password):
-    if not self.unlocked:
-      raise Exception("Cannot change the password on a locked database.")
-    
-    if len(new_password) < 20:
-      print("Your password is less than 20 characters.  To proceed with this week password, please type: weak password")
-      ans = input("> ")
-      if ans.strip().lower() != "weak password":
-        sys.exit(0)
-        
-    # Take the master password, derive the master-key-encryption-key from it
-    # Then encrypt the master key with the password-derived key
-    # Do the same with the hmac
-    
-    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(new_password, iterations=self.iterations)
-    hmac = PassLocker.make_hmac(new_password+aes_key, hmac_key)
-    ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
-    master = {
-      "algorithm" : "aes-256-cbc",
-      'salt' : b64e(salt),
-      'iterations' : iterations,
-      'hmac' : hmac, # this comes out as a hex string
-      'ciphertext' : b64e(ciphertext),
-      'iv' : b64e(iv)
-    }
-    fh = open(checkfile, 'w')
-    json.dump(master, fh)
-    fh.close()
-    
-  def list_accounts(self):
-    accounts = [ b64d(x.split('/')[-1][0:-5]) 
-      for x in glob.glob('%s/*.json' % self.dbdir) ]
-    return accounts
     
   def _to_db(self, account, username):
     if type(account) == str:
@@ -229,6 +200,44 @@ class PassLocker:
     msg = cipher.decrypt(ciphertext)
     return msg
 
+  def change_master_password(self, new_password):
+    if not self.unlocked:
+      raise Exception("Cannot change the password on a locked database.")
+    
+    if len(new_password) < 20:
+      print("Your password is less than 20 characters.  To proceed with this week password, please type: weak password")
+      ans = input("> ")
+      if ans.strip().lower() != "weak password":
+        sys.exit(0)
+        
+    if type(new_password) == str:
+      new_password = new_password.encode('UTF-8')
+      
+    # Take the master password, derive the master-key-encryption-key from it
+    # Then encrypt the master key with the password-derived key
+    # Do the same with the hmac
+    
+    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(new_password, iterations=self.iterations)
+    hmac = PassLocker.make_hmac(new_password+aes_key, hmac_key)
+    ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
+    master = {
+      "algorithm" : "aes-256-cbc",
+      'salt' : b64e(salt),
+      'iterations' : iterations,
+      'hmac' : hmac, # this comes out as a hex string
+      'ciphertext' : b64e(ciphertext),
+      'iv' : b64e(iv)
+    }
+    checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
+    fh = open(checkfile, 'w')
+    json.dump(master, fh)
+    fh.close()
+    
+  def list_accounts(self):
+    accounts = [ b64d(x.split('/')[-1][0:-5]) 
+      for x in glob.glob('%s/*.json' % self.dbdir) ]
+    return accounts
+    
   def add_account(self, account_name, username, **kwargs):
     acc = {
       "account" : account_name,
@@ -246,6 +255,14 @@ class PassLocker:
       
     self._write_account(acc, overwrite=False)
     return acc
+    
+  def del_account(self, account_name, username):
+    filename = self._to_db(account_name, username)
+    if os.path.exists(filename):
+      os.unlink(filename)
+      return True
+    else:
+      return False
   
   def add_password(self, account_name, username, password, encoding='UTF-8'):
     acc = self._load_account(account_name, username)
