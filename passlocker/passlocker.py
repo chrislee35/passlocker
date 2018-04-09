@@ -2,11 +2,7 @@
 import base64
 from base64 import b64encode as b64encode
 from base64 import b64decode as b64decode
-import json
-import sys, os
-import time
-import glob
-import getpass
+import json, sys, os, time, glob, getpass
 
 try:
     import Crypto
@@ -38,10 +34,12 @@ class PassLocker:
     self.unlocked = False
     if type(master_password) == str:
       master_password = master_password.encode('UTF-8')
+    starttime = time.time()
     if os.path.exists(checkfile):
       self._check_master_password(checkfile, master_password)
     else:
       self._initialize_master_password(checkfile, master_password)
+    self.timing = time.time() - starttime
       
   def _check_master_password(self, checkfile, master_password):
     fh = open(checkfile, 'r')
@@ -53,7 +51,7 @@ class PassLocker:
     
     # derive from the password the master-key-decryption-key 
     # (and the password-derived hmac), decrypt the master-key (and master-hmac)
-    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, salt=salt, iterations=iterations)
+    aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, salt=salt, iterations=iterations)    
     hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
     if master['hmac'] != hmac:
       raise Exception("Master password is incorrect.")

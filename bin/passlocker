@@ -46,11 +46,10 @@ def help(progname, cmd=None):
 # passlocker info hex 74657374206163636f756e74
 # passlocker info b64 dGVzdCBhY2NvdW50Cg==
 # passlocker get "test account"
-# passlocker add "test account 2" password
-# passlocker add "otp account" otp
-# passlocker add "totp account" totp [start_time] [interval] [num_digits] [hash_algo]
-# passlocker user "test account 2" "<username>"
-# passlocker note "test account 2" "<note>"
+# passlocker add password accountname username password
+# passlocker add otp accountname username password1 password2 ...
+# passlocker add totp accountname username start_time interval num_digits hash_algo
+# passlocker note accountname "<note>"
 # passlocker pw "test account 2" [raw|hex|b64] [file <filename>]
 #  it will prompt for the password if no file is specified
 # passlocker pw "otp account" [raw|hex|b64] [file <filename>]
@@ -269,7 +268,7 @@ def process():
       elif acctype == "totp":
         add_totp_account()
       else:
-        help()
+        help(sys.argv[0], cmd)
         sys.exit(0)
     except Exception as e:
       print(e)
@@ -284,7 +283,7 @@ def process():
   elif cmd == "chgpass":
     change_password()
   elif cmd == "help":
-    help("interactive")
+    help(sys.argv[0], "interactive")
   else:
     print("Unknown command: %s" % cmd)
 
@@ -300,6 +299,7 @@ if cmd == "help":
 
 password = getpass.getpass(prompt="Master password: ")
 pl = PassLocker(password)
+print("It took %0.2f seconds to unlock the master key" % pl.timing)
 
 if cmd == "interactive":
   import csv
