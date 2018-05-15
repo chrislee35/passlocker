@@ -38,7 +38,7 @@ supported_verbs = {
 # passlocker pw "otp account" [raw|hex|b64] [file <filename>]
 # passlocker pw "totp account" [raw|hex|b64] [file <filename>]
 
-def help(progname, cmd=None):
+def help(cmd=None):
   print("""# Examples
 # passlocker help
 # passlocker list
@@ -268,7 +268,7 @@ def process():
       elif acctype == "totp":
         add_totp_account()
       else:
-        help(sys.argv[0], cmd)
+        help(cmd)
         sys.exit(0)
     except Exception as e:
       print(e)
@@ -283,23 +283,24 @@ def process():
   elif cmd == "chgpass":
     change_password()
   elif cmd == "help":
-    help(sys.argv[0], "interactive")
+    help("interactive")
   else:
     print("Unknown command: %s" % cmd)
 
 if len(sys.argv) == 1:
-  help(sys.argv[0])
+  help()
   sys.exit(0)
 
 words = sys.argv[1:]
 cmd = words[0]
 if cmd == "help":
-  help(sys.argv[0], sys.argv)
+  help(sys.argv)
   sys.exit(0)
 
-password = getpass.getpass(prompt="Master password: ")
-pl = PassLocker(password)
-print("It took %0.2f seconds to unlock the master key" % pl.timing)
+def get_password():
+  return getpass.getpass(prompt="Master password: ")
+
+pl = PassLocker(get_password)
 
 if cmd == "interactive":
   import csv

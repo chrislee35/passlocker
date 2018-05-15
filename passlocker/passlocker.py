@@ -30,15 +30,26 @@ class PassLocker:
     self.iterations = kwargs.get('iterations', 100000)
     if not os.path.exists(self.dbdir):
       os.mkdir(self.dbdir)
-    checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
     self.unlocked = False
-    if type(master_password) == str:
-      master_password = master_password.encode('UTF-8')
+    self.master_password = master_password
+
+  def _unlock(self):
+    if self.unlocked:
+      return
     starttime = time.time()
+    checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
+    if str(type(self.master_password)) in ["<class 'function'>", "<class 'method'>"]:
+      self.master_password = self.master_password()
+    if type(self.master_password) == str:
+      self.master_password = self.master_password.encode('UTF-8')
+      
     if os.path.exists(checkfile):
-      self._check_master_password(checkfile, master_password)
+      self._check_master_password(checkfile, self.master_password)
     else:
-      self._initialize_master_password(checkfile, master_password)
+      self._initialize_master_password(checkfile, self.master_password)
+    # this doesn't erase the password from memory, but it does make it harder to access
+    self.master_password = None 
+    self.unlocked = True
     self.timing = time.time() - starttime
       
   def _check_master_password(self, checkfile, master_password):
@@ -199,9 +210,8 @@ class PassLocker:
     return msg
 
   def change_master_password(self, new_password):
-    if not self.unlocked:
-      raise Exception("Cannot change the password on a locked database.")
-    
+    self._unlock()
+        
     if len(new_password) < 20:
       print("Your password is less than 20 characters.  To proceed with this week password, please type: weak password")
       ans = input("> ")
@@ -263,6 +273,7 @@ class PassLocker:
       return False
   
   def add_password(self, account_name, username, password, encoding='UTF-8'):
+    self._unlock()
     acc = self._load_account(account_name, username)
     
     if type(password) == str:
@@ -293,6 +304,7 @@ class PassLocker:
     self._write_account(acc)
 
   def get_active_password(self, account_name, username, **kwargs):
+    self._unlock()
     acc = self._load_account(account_name, username)
 
     pa = acc.get('password.active')
@@ -351,6 +363,7 @@ class PassLocker:
     self._write_account(acc)
     
   def add_otp_account(self, account_name, username, passwords):
+    self._unlock()
     self.add_account(account_name, username, type='otp')
     for pw in passwords:
       self.add_password(account_name, username, pw)
@@ -358,6 +371,7 @@ class PassLocker:
     
   def add_totp_account(self, account_name, username, secret, **kwargs):
     kwargs['type'] = 'totp'
+    self._unlock()
     self.add_account(account_name, username, **kwargs)
     self.add_password(account_name, username, secret)
     
@@ -392,6 +406,7 @@ class PassLocker:
     return acc.get('notes', [])
     
   def add_question(self, account_name, username, question, answer, encoding = 'UTF-8'):
+    self._unlock()
     acc = self._load_account(account_name, username)
     if type(answer) == str:
       answer = answer.encode(encoding)
@@ -429,6 +444,8 @@ class PassLocker:
       return None
     if idx >= len(acc['questions']):
       return None
+    self._unlock()
+    
     q_entry = acc['questions'][idx]
     
     ciphertext = b64d(q_entry['ciphertext'])
