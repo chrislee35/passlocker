@@ -1,0 +1,23 @@
+name: passlocker
+version: git
+summary: PassLocker is a command-line utility for passwords
+description: |
+  command-line tool for saving passwords encrypted into a directory
+
+grade: stable
+confinement: strict
+
+apps:
+  passlocker:
+    command: bin/passlocker
+
+parts:
+  setup:
+    plugin: python
+    python-version: python3
+    python-packages: [pycrypto]
+  passlocker:
+    after: [setup]
+    plugin: python
+    python-version: python3
+    source: .
