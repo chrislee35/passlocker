@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+from passlocker import PassLocker
+import os, sys, base64
+import wx
+import wx.grid as gridlib
+import secrets
+
+class NewOTPAccountDialog(wx.Dialog): 
+    def __init__(self, parent, title): 
+        super(NewOTPAccountDialog, self).__init__(parent, title = title, size = (250,250))
+        self.parent = parent
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox5 = wx.BoxSizer(wx.HORIZONTAL)
+        l1 = wx.StaticText(panel, -1, "Account Name")
+        l2 = wx.StaticText(panel, -1, "User Name")
+        l3 = wx.StaticText(panel, -1, "One Time Passwords")
+        
+        self.t1 = wx.TextCtrl(panel)
+        self.t2 = wx.TextCtrl(panel)
+        self.t3 = wx.TextCtrl(panel, style = wx.TE_MULTILINE, size = (200,100))
+        
+        self.b1 = wx.Button(panel, wx.ID_OK, 'Add OTP Account')
+        self.b2 = wx.Button(panel, wx.ID_CANCEL, 'Cancel')
+        self.b3 = wx.Button(panel, -1, 'Generate')
+        self.b1.Bind(wx.EVT_BUTTON, self.addNewAccount)
+        self.b2.Bind(wx.EVT_BUTTON, self.OnClose)
+        self.b3.Bind(wx.EVT_BUTTON, self.GeneratePasswords)
+        
+        hbox1.Add(l1, 1, wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(l2, 1, wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(l3, 1, wx.ALIGN_LEFT|wx.ALL,5)
+
+        hbox1.Add(self.t1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(self.t2,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(self.t3,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        
+        hbox5.Add(self.b1,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+        hbox5.Add(self.b2,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+        hbox5.Add(self.b3,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+
+        vbox.Add(hbox1)
+        vbox.Add(hbox2)
+        vbox.Add(hbox3)
+        vbox.Add(hbox5)
+
+        panel.SetSizer(vbox)
+
+        self.Centre()
+        self.Show()
+        self.Fit()
+
+    def addNewAccount(self, event):
+        accname = self.t1.GetValue()
+        username = self.t2.GetValue()
+        passwords = self.t3.GetValue()
+        self.parent.pl.add_account(accname, username, type='otp')
+        acc = self.parent.pl._load_account(accname, username)
+        pa = acc.get('password.active')
+        if pa == 0:
+          pa = 1
+        for password in [x.strip() for x in passwords.split('\n')]:
+            self.parent.pl.add_password(accname, username, password)
+        self.parent.pl.set_active_password(accname, username, pa, skip=1)
+        
+        self.OnClose(event)
+        
+    def OnClose(self, event):
+        if self.IsModal():
+            self.EndModal(event.EventObject.Id)
+        else:
+            self.Close()
+            
+    def GeneratePasswords(self, event):
+        dlg = GeneratePasswordDialog(self, 'Generate New Passwords', multiple=True)
+        ret = dlg.ShowModal()
+        if ret == wx.ID_OK:
+            passwords = dlg.GetPassword()
+            self.t3.SetValue(passwords)
+
+class GeneratePasswordDialog(wx.Dialog):
+    def __init__(self, parent, title, multiple=False):
+        height = 200
+        if multiple:
+            height = 400
+        super(GeneratePasswordDialog, self).__init__(parent.parent, title = title, size = (250, height))
+        self.parent = parent
+        self.retval = wx.ID_CANCEL
+        self.multiple = multiple
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox4 = wx.BoxSizer(wx.HORIZONTAL)
+        
+        l1 = wx.StaticText(panel, -1, "Type")
+        l2 = wx.StaticText(panel, -1, "Suggestion")
+        l3 = wx.StaticText(panel, -1, "Length")
+        if multiple:
+            hbox5 = wx.BoxSizer(wx.HORIZONTAL)
+            l4 = wx.StaticText(panel, -1, "Number to generate")
+            self.s2 = wx.Slider(panel, value=1, minValue=1, maxValue=32, style = wx.SL_HORIZONTAL|wx.SL_LABELS|wx.SL_AUTOTICKS|wx.SL_MIN_MAX_LABELS)
+            self.s2.SetTickFreq(1)
+        
+        self.c1 = wx.ComboBox(panel, choices=['Memorable', 'Random', 'Numbers'])
+        if multiple:
+            self.t1 = wx.TextCtrl(panel, style=wx.TE_MULTILINE, size=(200,100))
+        else:
+            self.t1 = wx.TextCtrl(panel)
+            
+        minLength = 8
+        defaultLength = 12
+        if multiple:
+            minLength = 4
+            defaultLength = 6
+        self.s1 = wx.Slider(panel, value=defaultLength, minValue=minLength, maxValue=32, style = wx.SL_HORIZONTAL|wx.SL_LABELS|wx.SL_AUTOTICKS|wx.SL_MIN_MAX_LABELS)
+        self.s1.SetTickFreq(1)
+        self.b1 = wx.Button(panel, wx.ID_OK, "Accept")
+        self.b2 = wx.Button(panel, wx.ID_CANCEL, "Cancel")
+        
+        self.c1.Bind(wx.EVT_COMBOBOX, self.GeneratePassword)
+        self.s1.Bind(wx.EVT_SLIDER, self.GeneratePassword)
+        self.s2.Bind(wx.EVT_SLIDER, self.GeneratePassword)
+        self.b1.Bind(wx.EVT_BUTTON, self.ButtonClicked)
+        self.b2.Bind(wx.EVT_BUTTON, self.ButtonClicked)
+                
+        hbox1.Add(l1, 1, wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(l2, 1, wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(l3, 1, wx.ALIGN_LEFT|wx.ALL,5)
+        hbox1.Add(self.c1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(self.t1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(self.s1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        if multiple:
+            hbox5.Add(l4, 1, wx.ALIGN_LEFT|wx.ALL, 5)
+            hbox5.Add(self.s2, 1, wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox4.Add(self.b1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox4.Add(self.b2,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        
+        vbox.Add(hbox1)
+        vbox.Add(hbox2)
+        vbox.Add(hbox3)
+        if multiple:
+            vbox.Add(hbox5)
+        vbox.Add(hbox4)
+
+        panel.SetSizer(vbox)
+
+        self.Centre()
+        self.Show()
+        self.Fit()
+        
+    def ButtonClicked(self, event):
+        if self.IsModal():
+            self.EndModal(event.EventObject.Id)
+        else:
+            self.Close()
+
+    def GeneratePassword(self, event):
+        gentype = self.c1.GetValue()
+        length = self.s1.GetValue()
+        count = 1
+        if self.multiple:
+            count = self.s2.GetValue()
+            
+        newpass = []
+        for i in range(count):
+            if gentype == 'Memorable':
+                newpass.append(self.generate_memorable(length))
+            elif gentype == 'Random':
+                newpass.append(self.generate_random(length))
+            elif gentype == 'Numbers':
+                newpass.append(self.generate_numbers(length))
+            else:
+                pass
+        self.t1.SetValue('\n'.join(newpass))
+        self.password = '\n'.join(newpass)
+        
+    def generate_memorable(self, length):
+        if length <= 8:
+            maxnum = 100
+            special = 0
+        elif length <= 16:
+            maxnum = 1000
+            special = 1
+        elif length <= 24:
+            maxnum = 10000
+            special = 2
+        else:
+            maxnum = 100000
+            special = 3
+            
+        random_int = secrets.randbelow(maxnum)
+        random_special = ''.join(secrets.choice(['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '+', '=', '{', '}', '[', ']', ':', ';', '<', '>', '.', ',', '?', '/', '~', '`']) for i in range(special))
+        
+        secret_sauce = '%d%s' % (random_int, random_special)
+        
+        with open('/usr/share/dict/words') as f:
+            words = [word.strip() for word in f]
+            genlen = 0
+            while genlen != length:
+                password = secret_sauce.join(secrets.choice(words) for i in range(2))
+                genlen = len(password)
+                
+        return password
+        
+    def generate_random(self, length):
+        return secrets.token_urlsafe(32)[0:length]
+        
+    def generate_numbers(self, length):
+        return ''.join([str(secrets.choice(range(10))) for i in range(length)])
+        
+    def GetPassword(self):
+        return self.password
+                
+class NewAccountDialog(wx.Dialog): 
+    def __init__(self, parent, title): 
+        super(NewAccountDialog, self).__init__(parent, title = title, size = (250,250))
+        self.parent = parent
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox4 = wx.BoxSizer(wx.HORIZONTAL)
+        hbox5 = wx.BoxSizer(wx.HORIZONTAL)
+        l1 = wx.StaticText(panel, -1, "Account Name")
+        l2 = wx.StaticText(panel, -1, "User Name")
+        l3 = wx.StaticText(panel, -1, "Password")
+        l4 = wx.StaticText(panel, -1, "Confirm")
+        
+        self.t1 = wx.TextCtrl(panel)
+        self.t2 = wx.TextCtrl(panel)
+        self.t3 = wx.TextCtrl(panel, style = wx.TE_PASSWORD)
+        self.t4 = wx.TextCtrl(panel, style = wx.TE_PASSWORD)
+        
+        self.b1 = wx.Button(panel, wx.ID_OK, 'Add Account')
+        self.b2 = wx.Button(panel, wx.ID_CANCEL, 'Cancel')
+        self.b3 = wx.Button(panel, -1, 'Generate')
+        self.b1.Bind(wx.EVT_BUTTON, self.addNewAccount)
+        self.b2.Bind(wx.EVT_BUTTON, self.OnClose)
+        self.b3.Bind(wx.EVT_BUTTON, self.GeneratePassword)
+        
+        hbox1.Add(l1, 1, wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(l2, 1, wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(l3, 1, wx.ALIGN_LEFT|wx.ALL,5)
+        hbox4.Add(l4, 1, wx.ALIGN_LEFT|wx.ALL,5)
+
+        hbox1.Add(self.t1,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox2.Add(self.t2,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox3.Add(self.t3,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        hbox4.Add(self.t4,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
+        
+        hbox5.Add(self.b1,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+        hbox5.Add(self.b2,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+        hbox5.Add(self.b3,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+
+        vbox.Add(hbox1)
+        vbox.Add(hbox2)
+        vbox.Add(hbox3)
+        vbox.Add(hbox4)
+        vbox.Add(hbox5)
+
+        panel.SetSizer(vbox)
+
+        self.Centre()
+        self.Show()
+        self.Fit()
+
+    def addNewAccount(self, event):
+        accname = self.t1.GetValue()
+        username = self.t2.GetValue()
+        password = self.t3.GetValue()
+        confirm = self.t4.GetValue()
+        if password != confirm:
+            dlg = wx.MessageDialog(self, 'Passwords did not match.', 'Password Mismatch', style=wx.ICON_EXCLAMATION)
+            dlg.ShowModal()
+            dlg.Destroy()
+        else:
+            self.parent.pl.add_account(accname, username)
+            self.parent.pl.add_password(accname, username, password)
+            self.OnClose(event)
+        
+    def OnClose(self, event):
+        if self.IsModal():
+            self.EndModal(event.EventObject.Id)
+        else:
+            self.Close()
+        
+    def GeneratePassword(self, event):
+        dlg = GeneratePasswordDialog(self, 'Generate New Password')
+        ret = dlg.ShowModal()
+        print(ret)
+        if ret == wx.ID_OK:
+            password = dlg.GetPassword()
+            self.t3.SetValue(password)
+            self.t4.SetValue(password)
+      
+class PassLockerGui(wx.Frame):
+    def __init__(self, *args, **kw):
+        # ensure the parent's __init__ is called
+        super(PassLockerGui, self).__init__(*args, **kw)
+        self.pl = PassLocker(self.get_master_password)
+
+        # create a panel in the frame
+        self.pnl = pnl = wx.Panel(self)
+
+        # and put some text with a larger bold font on it
+        st = wx.StaticText(pnl, label="PassLocker GUI", pos=(25,25))
+        font = st.GetFont()
+        font.PointSize += 10
+        font = font.Bold()
+        st.SetFont(font)
+        
+        textField = wx.TextCtrl(pnl)
+        self.Bind(wx.EVT_TEXT, self.OnChange, textField)
+        self.Bind(wx.EVT_CHAR, self.OnKeyPress, textField)
+
+        # create a menu bar
+        self.makeMenuBar()
+        self.listPasswords()
+
+        # and a status bar
+        self.CreateStatusBar()
+        self.SetStatusText("Welcome to PassLocker GUI!")
+                
+    def get_master_password(self): 
+        dlg = wx.PasswordEntryDialog(self, 'Enter Master Password', 'Master Password') 
+        password = ''
+        if dlg.ShowModal() == wx.ID_OK:
+            password = dlg.GetValue()
+        #dlg.Destroy()
+        return password
+
+    def makeMenuBar(self):
+        """
+        A menu bar is composed of menus, which are composed of menu items.
+        This method builds a set of menus and binds handlers to be called
+        when the menu item is selected.
+        """
+
+        # Make a file menu with Hello and Exit items
+        fileMenu = wx.Menu()
+        # The "\t..." syntax defines an accelerator key that also triggers
+        # the same event
+        newAccountItem = fileMenu.Append(-1, "New &Account...\tCtrl-A",
+                "Create a new password account")
+        newOTPAccountItem = fileMenu.Append(-1, "New &OTP Account...\tCtrl-O",
+                "Create a new OTP account")
+        newTOTPAccountItem = fileMenu.Append(-1, "New &TOTP Account...\tCtrl-T",
+                "Create a new TOTP account")
+        newPasswordItem = fileMenu.Append(-1, "New &Password...\tCtrl-N",
+                "Add a new password to an existing account")
+        fileMenu.AppendSeparator()
+        # When using a stock ID we don't need to specify the menu item's
+        # label
+        exitItem = fileMenu.Append(wx.ID_EXIT)
+
+        # Now a help menu for the about item
+        helpMenu = wx.Menu()
+        aboutItem = helpMenu.Append(wx.ID_ABOUT)
+
+        # Make the menu bar and add the two menus to it. The '&' defines
+        # that the next letter is the "mnemonic" for the menu item. On the
+        # platforms that support it those letters are underlined and can be
+        # triggered from the keyboard.
+        menuBar = wx.MenuBar()
+        menuBar.Append(fileMenu, "&File")
+        menuBar.Append(helpMenu, "&Help")
+
+        # Give the menu bar to the frame
+        self.SetMenuBar(menuBar)
+
+        # Finally, associate a handler function with the EVT_MENU event for
+        # each of the menu items. That means that when that menu item is
+        # activated then the associated handler function will be called.
+        self.Bind(wx.EVT_MENU, self.OnNewAccount, newAccountItem)
+        self.Bind(wx.EVT_MENU, self.OnNewOTPAccount, newOTPAccountItem)
+        self.Bind(wx.EVT_MENU, self.OnNewTOTPAccount, newTOTPAccountItem)
+        self.Bind(wx.EVT_MENU, self.OnNewPassword, newPasswordItem)
+        self.Bind(wx.EVT_MENU, self.OnExit,  exitItem)
+        self.Bind(wx.EVT_MENU, self.OnAbout, aboutItem)
+
+    def listPasswords(self):
+        accs = self.pl.list_accounts()
+        accs.sort()
+        
+        myGrid = gridlib.Grid(self.pnl)
+        myGrid.CreateGrid(len(accs), 2)
+
+        row = 0
+        for acc in accs:
+            accountName, userName = acc.decode('UTF-8').split('|', 1)
+            myGrid.SetCellValue(row, 0, accountName)
+            myGrid.SetCellValue(row, 1, userName)
+            myGrid.SetReadOnly(row, 0, True)
+            myGrid.SetReadOnly(row, 1, True)
+            row += 1
+            
+        myGrid.AutoSizeColumns()
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(myGrid, 1, wx.EXPAND | wx.ALL)
+        h,w = sizer.GetSize()
+        self.pnl.SetSizer(sizer)
+        self.pnl.SetSize(h,w)
+        sizer.Fit(self)
+        myGrid.Bind(gridlib.EVT_GRID_CELL_LEFT_CLICK, self.OnCellLeftClick)
+        self.grid = myGrid
+
+    def OnCellLeftClick(self, evt):
+        #print("OnCellLeftClick: (%d,%d) %s\n" % (evt.GetRow(), evt.GetCol(), evt.GetPosition()))
+        accname = self.grid.GetCellValue(evt.GetRow(), 0)
+        username = self.grid.GetCellValue(evt.GetRow(), 1)
+        evt.Skip()
+        pw = self.pl.get_active_password(accname, username)
+        dlg = wx.MessageDialog(self, pw.decode('UTF-8'), 'Password')
+        dlg.ShowModal()
+        dlg.Destroy()
+        
+
+    def OnExit(self, event):
+        """Close the frame, terminating the application."""
+        self.Close(True)
+
+
+    def OnNewAccount(self, event):
+        dlg = NewAccountDialog(self, 'New Account')
+        if dlg.ShowModal() == wx.ID_OK:
+            print("you should reload the list")
+
+    def OnNewOTPAccount(self, event):
+        dlg = NewOTPAccountDialog(self, 'New OTP Account')
+        if dlg.ShowModal() == wx.ID_OK:
+            print("you should reload the list")
+
+    def OnNewTOTPAccount(self, event):
+        dlg = NewAccountDialog(self, 'New Account')
+        if dlg.ShowModal() == wx.ID_OK:
+            print("you should reload the list")
+        
+    def OnNewPassword(self, event):
+        pass
+        
+    def OnHello(self, event):
+        """Say hello to the user."""
+        wx.MessageBox("Hello again from wxPython")
+
+
+    def OnAbout(self, event):
+        """Display an About Dialog"""
+        wx.MessageBox("This is a wxPython Hello World sample",
+                      "About Hello World 2",
+                      wx.OK|wx.ICON_INFORMATION)
+
+    def OnChange(self, event):
+        print(event)
+        
+    def OnKeyPress(self, event):
+        print(event)
+
+if __name__ == "__main__":
+    app = wx.App()
+    frm = PassLockerGui(None, title='PassLocker GUI')
+    frm.Show()
+    app.MainLoop()
