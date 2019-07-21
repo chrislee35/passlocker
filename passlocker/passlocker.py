@@ -242,8 +242,20 @@ class PassLocker:
         fh.close()
         
     def list_accounts(self):
-        accounts = [ b64d(x.split('/')[-1][0:-5]).decode('UTF-8').replace('|', ' ', 1).encode('UTF-8')
-            for x in glob.glob('%s/*.json' % self.dbdir) ]
+        #s1 = time.time()
+        # listdir is 3 times faster than glob (0.4 ms vs. 1.2 ms for 461 files)
+        # timing still heavily dependent on os file caching
+        files = os.listdir(self.dbdir)
+        files = [ x for x in files if x.endswith(".json") ]
+        #s2 = time.time()
+        b64strs = [ x.split('/')[-1][0:-5] for x in files ]
+        #s3 = time.time()
+        b64decoded = [ b64d(x) for x in b64strs ]
+        #s4 = time.time()
+        accounts = [ x.decode('UTF-8').replace('|', ' ', 1).encode('UTF-8') for x in b64decoded ]
+        #s5 = time.time()
+        #print("list files: %0.2f, b64str: %0.2f, b64decode: %0.2f, format: %0.2f" % ((s2 - s1)*1000, (s3 - s2)*1000, (s4 - s3)*1000, (s5 - s4)*1000))
+        
         return accounts
         
     def add_account(self, account_name, username, **kwargs):
