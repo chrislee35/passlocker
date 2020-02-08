@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+from passlocker import PassLocker
+import getpass
+import argparse
+import configparser
+import os, sys, base64, traceback
+from binascii import unhexlify
+from pprint import pprint
+
+password = None
+dbdir = '%s/.passlocker' % os.environ['HOME']
+pl = None
+words = list()
+
+def next_word(use_previous_encoding=False):
+    if len(words) == 0:
+        return None
+    word = words.pop(0)
+    if word in ['hex', 'b64', 'raw']:
+        previous_encoding = word
+        return dec(words.pop(0), word)
+    elif use_previous_encoding:
+        return dec(word, previous_encoding)
+    else:
+        return word
+    
+def dec(item, encoding='raw'):
+    if encoding == 'hex':
+        return unhexlify(item)
+    elif encoding == 'b64':
+        return base64.b64decode(item)
+    elif encoding == 'raw':
+        return item.encode('UTF-8')
+    elif encoding == 'bytes':
+        return item
+    return item
+     
+def pl_prompt(message, default="", options=None):
+    while True:
+        if options:
+            print("Options: [%s]" % ", ".join(options))
+        
+        a = input('%s: [%s] ' % (message, str(default)))
+        if a == None or a == "":
+            a = default
+        
+        a = type(default)(a)
+        if options:
+            if a in options:
+                return a
+        else:
+            return a
+        
+def help_main():
+    print("""help    prints out this help message
+list    list password entries
+add     creates a new password entry
+exit    exits the tool""")
+
+def help_list():
+    print("""help   prints out this help message
+info   provides information about a password entry
+get    retrieves password for a password entry
+addpw  adds or updates the password for a password entry
+del    deletes a password entry
+note   add a note to the password entry
+exit   returns to the top menu""")
+
+def menu():
+    cmd = input("> ")
+    if cmd == 'help':
+        help_main()
+    elif cmd == 'list':
+        list_accounts()
+    elif cmd == 'add':
+        add_account()
+    elif cmd == 'exit':
+        return False
+    return True
+
+def list_accounts():
+    filt = input("search filter: ")
+    accs = pl.list_accounts()
+    if filt:
+        accs = [ x for x in accs if filt in str(x) ]
+    item = 0
+    for acc in accs:
+        print(str(item)+"\t"+acc.decode('UTF-8'))
+        item += 1
+    cmd = pl_prompt("entry #", 0)
+    while cmd == 'help':
+        help_list()
+        cmd = pl_prompt("entry #", 0)
+    i = int(cmd)
+    accname, username = accs[i].split(b' ', 1)
+    while True:
+        cmd = pl_prompt("[help|info|get|addpw|del|note|exit]", "help", ["help","info","get","addpw","del","exit","note"])
+        if cmd == 'help':
+            help_list()
+        elif cmd == 'info':
+            acc = pl._load_account(accname, username)
+            pprint(acc)
+        elif cmd == 'get':
+            pw = pl.get_active_password(accname, username)
+            print(pw.decode('UTF-8'))
+        elif cmd == 'addpw':
+            password = getpass.getpass('Enter password for account, {accname}: '.format(accname=accname))
+            if password == None or password == "":
+                return
+            pl.add_password(accname, username, password)
+        elif cmd == 'del':
+            confirm = pl_prompt('Delete account (yes|no)', 'no')
+            if confirm and confirm.lower() == 'yes':
+                deleted = pl.del_account(accname, username)
+                if deleted:
+                    print("Account, {accname}, deleted.".format(accname=accname))
+                else:
+                    print("Cound not delete {accname}".format(accname=accname))
+        elif cmd == 'note':
+            note = input("Note: ")
+            if note and len(note) > 0:
+                pl.add_note(accname, username, note)
+        elif cmd == 'exit':
+            return
+        
+def add_account():
+    try:
+        acctype = pl_prompt("Which account type?", "password", ["password", "otp", "totp"])
+        if acctype == "password":
+            add_password_account()
+        elif acctype == "otp":
+            add_otp_account()
+        elif acctype == "totp":
+            add_totp_account()
+        else:
+            return
+    except Exception as e:
+        #traceback.print_exc(file=sys.stdout)
+        print(e)
+
+def add_password_account():
+    accname = next_word() or pl_prompt("Account name?")
+    username = next_word() or pl_prompt("Username")
+    pl.add_account(accname, username, type='password')
+    password = next_word()
+    if password:
+        if password == '-':
+            encoding = 'raw'
+            password = getpass.getpass('Enter password for account, %s %s (%s): ' % (accname, username, encoding))
+            if password == None or password == "":
+                sys.exit(0)
+            password = dec(password, encoding)
+            pl.add_password(accname, username, password)
+        else:
+            pl.add_password(accname, username, password)
+    
+def add_otp_account():    
+    accname = next_word() or pl_prompt("Account name?")
+    username = next_word() or pl_prompt("Username")
+    pl.add_account(accname, username, type='otp')
+    password = next_word()
+    if password:
+        acc = pl._load_account(accname, username)
+        # there's a decision that is needed here.    If we add a batch of OTP passwords to
+        # a list of existing passwords, should I keep the active password where it's at
+        # or point it to the first item of the added items.
+        # For now, I will leave the active password index where it's at.
+        pa = acc.get('password.active')
+        if pa == 0:
+            pa = 1
+        while password:
+            pl.add_password(accname, username, password)
+            password = next_word()
+        pl.set_active_password(accname, username, pa, skip=1)
+
+def add_totp_account():
+    accname = next_word() or pl_prompt("Account name?")
+    username = next_word() or pl_prompt("Username")
+    word = next_word()
+    if word == None:
+        epoch_start = pl_prompt('Start time (epoch seconds)', 0)
+    else:
+        epoch_start = int(word)
+    word = next_word()
+    if word == None:
+        time_interval = pl_prompt('Time interval (seconds)', 30)
+    else:
+        time_interval = int(word)
+    word = next_word()
+    if word == None:
+        num_digits = pl_prompt('Number of digits to return', 6)
+    else:
+        num_digits = int(word)
+    word = next_word()
+    if word == None or not word in ['sha1', 'md5', 'sha256']:
+        hash_algorithm = pl_prompt('Which hash algorithm to use', 'sha1', ['sha1', 'md5', 'sha256'])
+    else:
+        hash_algorithm = word
+        
+    pl.add_account(accname, username, type=acctype, 
+        epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
+        hash_algorithm=hash_algorithm)        
+
+def del_account():
+    accname, username = get_account_and_username()
+    confirm = next_word()
+    if confirm == None:
+        confirm = pl_prompt('Delete account (yes|no)', 'no')
+    if confirm and confirm.lower() == 'yes':
+        deleted = pl.del_account(accname, username)
+        if deleted:
+            print("Account, {accname}, deleted.".format(accname=accname))
+        else:
+            print("Cound not delete {accname}".format(accname=accname))
+
+def get_master_password():
+    return getpass.getpass(prompt="Master password: ")
+
+pl = PassLocker(get_master_password)
+
+while menu():
+    pass
+
+
