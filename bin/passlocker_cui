@@ -67,7 +67,7 @@ note   add a note to the password entry
 exit   returns to the top menu""")
 
 def menu():
-    cmd = input("> ")
+    cmd = pl_prompt("Main menu", "exit", ["list","add","help","exit"])
     if cmd == 'help':
         help_main()
     elif cmd == 'list':
@@ -84,6 +84,9 @@ def list_accounts():
     if filt:
         accs = [ x for x in accs if filt in str(x) ]
     item = 0
+    if len(accs) == 0:
+        print("No accounts found")
+        return
     for acc in accs:
         print(str(item)+"\t"+acc.decode('UTF-8'))
         item += 1
@@ -94,7 +97,7 @@ def list_accounts():
     i = int(cmd)
     accname, username = accs[i].split(b' ', 1)
     while True:
-        cmd = pl_prompt("[help|info|get|addpw|del|note|exit]", "help", ["help","info","get","addpw","del","exit","note"])
+        cmd = pl_prompt("%s %s" % (accname.decode('UTF-8'), username.decode('UTF-8')), "exit", ["help","info","get","addpw","del","exit","note"])
         if cmd == 'help':
             help_list()
         elif cmd == 'info':
@@ -104,7 +107,7 @@ def list_accounts():
             pw = pl.get_active_password(accname, username)
             print(pw.decode('UTF-8'))
         elif cmd == 'addpw':
-            password = getpass.getpass('Enter password for account, {accname}: '.format(accname=accname))
+            password = getpass.getpass('Enter password for account, {accname}: '.format(accname=accname.decode('UTF-8')))
             if password == None or password == "":
                 return
             pl.add_password(accname, username, password)
@@ -113,9 +116,9 @@ def list_accounts():
             if confirm and confirm.lower() == 'yes':
                 deleted = pl.del_account(accname, username)
                 if deleted:
-                    print("Account, {accname}, deleted.".format(accname=accname))
+                    print("Account, {accname}, deleted.".format(accname=accname.decode('UTF-8')))
                 else:
-                    print("Cound not delete {accname}".format(accname=accname))
+                    print("Cound not delete {accname}".format(accname=accname.decode('UTF-8')))
         elif cmd == 'note':
             note = input("Note: ")
             if note and len(note) > 0:
