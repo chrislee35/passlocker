@@ -2,6 +2,7 @@
 import base64
 from base64 import b64encode as b64encode
 from base64 import b64decode as b64decode
+from base64 import b32decode as b32decode
 import json, sys, os, time, glob, getpass
 
 try:
@@ -23,6 +24,9 @@ def b64d(s):
     
 def b64e(b):
     return b64encode(b).decode('UTF-8')
+    
+def b32d(s):
+    return b32decode(s.encode('UTF-8'))
 
 class PassLocker:
     def __init__(self, master_password, **kwargs):
@@ -336,7 +340,11 @@ class PassLocker:
     
         output_data = PassLocker.decrypt(ciphertext, self.aes_key, iv)
         if password['encoding'] != 'bytes':
-            output_data.decode(password['encoding'])
+            output_data = output_data.decode(password['encoding'])
+        if acc['type'] == 'totp':
+            print(output_data)
+            output_data = b32d(output_data)
+            print(output_data)
             
         skip = acc.get('password.skip', 0)
         if skip != 0:
@@ -360,7 +368,7 @@ class PassLocker:
             offset = output[len(output) - 1] & 0xf;
             binary = ((output[offset] & 0x7f) << 24) | ((output[offset + 1] & 0xff) << 16) | ((output[offset + 2] & 0xff) << 8) | (output[offset + 3] & 0xff)
             
-            output_data = str(binary)[-acc['num_digits']:]
+            output_data = str(binary)[-acc['num_digits']:].encode('UTF-8')
             
         if kwargs.get('decode'):
             output_data = output_data.decode(kwargs['decode'])

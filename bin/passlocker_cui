@@ -200,9 +200,9 @@ def add_totp_account():
     else:
         hash_algorithm = word
         
-    pl.add_account(accname, username, type=acctype, 
+    pl.add_account(accname, username, type='totp', 
         epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
-        hash_algorithm=hash_algorithm)        
+        hash_algorithm=hash_algorithm)
 
 def del_account():
     accname, username = get_account_and_username()

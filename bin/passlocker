@@ -178,7 +178,7 @@ def add_totp_account():
     else:
         hash_algorithm = word
         
-    pl.add_account(accname, username, type=acctype, 
+    pl.add_account(accname, username, type='totp', 
         epoch_start=epoch_start, time_interval=time_interval, num_digits=num_digits,
         hash_algorithm=hash_algorithm)        
 
@@ -241,14 +241,15 @@ def add_password():
                 pl.add_password(accname, username, password)
             pl.set_active_password(accname, username, 1, skip=1)
     elif acc['type'] == 'totp':
+        encoding = 'raw'
         if len(passwords) > 0:
             for password in passwords:
                 password = dec(password, encoding)
-                pl.add_password(account_name, username, password)
+                pl.add_password(accname, username, password)
         else:
             password = getpass.getpass('Enter secret for TOTP account, %s (%s): ' % (accname, encoding))
             password = dec(password, encoding)
-            pl.add_password(account_name, username, secret)
+            pl.add_password(accname, username, password)
      
 def add_note():
     accname, username = get_account_and_username()
