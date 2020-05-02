@@ -101,7 +101,7 @@ def account_info():
 def get_password():
     accname, username = get_account_and_username()
     pw = pl.get_active_password(accname, username)
-    print(pw.decode('UTF-8'))
+    print(pw)
     
 def add_account():
     try:

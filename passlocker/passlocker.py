@@ -342,9 +342,7 @@ class PassLocker:
         if password['encoding'] != 'bytes':
             output_data = output_data.decode(password['encoding'])
         if acc['type'] == 'totp':
-            print(output_data)
             output_data = b32d(output_data)
-            print(output_data)
             
         skip = acc.get('password.skip', 0)
         if skip != 0:
@@ -372,7 +370,9 @@ class PassLocker:
             
         if kwargs.get('decode'):
             output_data = output_data.decode(kwargs['decode'])
-                
+        elif type(output_data) != str:
+            output_data = output_data.decode('UTF-8')
+        
         return output_data
         
     def set_active_password(self, account_name, username, active_password, **kwargs):
