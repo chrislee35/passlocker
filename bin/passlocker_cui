@@ -6,6 +6,7 @@ import configparser
 import os, sys, base64, traceback
 from binascii import unhexlify
 from pprint import pprint
+import secrets
 
 password = None
 dbdir = '%s/.passlocker' % os.environ['HOME']
@@ -55,6 +56,7 @@ def help_main():
     print("""help    prints out this help message
 list    list password entries
 add     creates a new password entry
+genpass randomly generates passwords
 exit    exits the tool""")
 
 def help_list():
@@ -67,13 +69,15 @@ note   add a note to the password entry
 exit   returns to the top menu""")
 
 def menu():
-    cmd = pl_prompt("Main menu", "exit", ["list","add","help","exit"])
+    cmd = pl_prompt("Main menu", "exit", ["list","add","genpass","help","exit"])
     if cmd == 'help':
         help_main()
     elif cmd == 'list':
         list_accounts()
     elif cmd == 'add':
         add_account()
+    elif cmd == 'genpass':
+        generate_password_menu()
     elif cmd == 'exit':
         return False
     return True
@@ -236,6 +240,52 @@ def del_account():
 
 def get_master_password():
     return getpass.getpass(prompt="Master password: ")
+
+def generate_password_menu():
+    gentype = pl_prompt("Password type", "memorable", ["memorable", "random", "numbers"])
+    length = pl_prompt("Length", 12)
+    count = pl_prompt("How many passwords?", 1)
+    for i in range(count):
+        if gentype == "memorable":
+            print(generate_memorable(length))
+        elif gentype == "random":
+            print(generate_random(length))
+        elif gentype == "numbers":
+            print(generate_numbers(length))
+
+def generate_memorable(length):
+    if length <= 8:
+        maxnum = 100
+        special = 0
+    elif length <= 16:
+        maxnum = 1000
+        special = 1
+    elif length <= 24:
+        maxnum = 10000
+        special = 2
+    else:
+        maxnum = 100000
+        special = 3
+        
+    random_int = secrets.randbelow(maxnum)
+    random_special = ''.join(secrets.choice(['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '+', '=', '{', '}', '[', ']', ':', ';', '<', '>', '.', ',', '?', '/', '~', '`']) for i in range(special))
+    
+    secret_sauce = '%d%s' % (random_int, random_special)
+    
+    with open('/usr/share/dict/words') as f:
+        words = [word.strip() for word in f]
+        genlen = 0
+        while genlen != length:
+            password = secret_sauce.join(secrets.choice(words) for i in range(2))
+            genlen = len(password)
+            
+    return password
+    
+def generate_random(length):
+    return secrets.token_urlsafe(32)[0:length]
+    
+def generate_numbers(length):
+    return ''.join([str(secrets.choice(range(10))) for i in range(length)])
 
 pl = PassLocker(get_master_password)
 

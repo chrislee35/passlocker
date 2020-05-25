@@ -125,7 +125,8 @@ class GeneratePasswordDialog(wx.Dialog):
         
         self.c1.Bind(wx.EVT_COMBOBOX, self.GeneratePassword)
         self.s1.Bind(wx.EVT_SLIDER, self.GeneratePassword)
-        self.s2.Bind(wx.EVT_SLIDER, self.GeneratePassword)
+        if multiple:
+            self.s2.Bind(wx.EVT_SLIDER, self.GeneratePassword)
         self.b1.Bind(wx.EVT_BUTTON, self.ButtonClicked)
         self.b2.Bind(wx.EVT_BUTTON, self.ButtonClicked)
                 
@@ -256,9 +257,9 @@ class NewAccountDialog(wx.Dialog):
         hbox3.Add(self.t3,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
         hbox4.Add(self.t4,1,wx.EXPAND|wx.ALIGN_LEFT|wx.ALL,5)
         
-        hbox5.Add(self.b1,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
-        hbox5.Add(self.b2,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
-        hbox5.Add(self.b3,1,wx.EXPAND|wx.ALIGN_RIGHT|wx.ALL,5)
+        hbox5.Add(self.b1,1,wx.EXPAND|wx.ALL,5)
+        hbox5.Add(self.b2,1,wx.EXPAND|wx.ALL,5)
+        hbox5.Add(self.b3,1,wx.EXPAND|wx.ALL,5)
 
         vbox.Add(hbox1)
         vbox.Add(hbox2)
@@ -395,7 +396,7 @@ class PassLockerGui(wx.Frame):
 
         row = 0
         for acc in accs:
-            accountName, userName = acc.decode('UTF-8').split('|', 1)
+            accountName, userName = acc.decode('UTF-8').split(' ', 1)
             myGrid.SetCellValue(row, 0, accountName)
             myGrid.SetCellValue(row, 1, userName)
             myGrid.SetReadOnly(row, 0, True)
@@ -418,7 +419,7 @@ class PassLockerGui(wx.Frame):
         username = self.grid.GetCellValue(evt.GetRow(), 1)
         evt.Skip()
         pw = self.pl.get_active_password(accname, username)
-        dlg = wx.MessageDialog(self, pw.decode('UTF-8'), 'Password')
+        dlg = wx.MessageDialog(self, pw, 'Password')
         dlg.ShowModal()
         dlg.Destroy()
         
