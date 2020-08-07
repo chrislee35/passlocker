@@ -3,7 +3,7 @@ import base64
 from base64 import b64encode as b64encode
 from base64 import b64decode as b64decode
 from base64 import b32decode as b32decode
-import json, sys, os, time, glob, getpass
+import json, sys, os, time, glob, getpass, secrets
 
 try:
         import Crypto
@@ -14,7 +14,6 @@ except ImportError:
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC, SHA256, SHA, MD5
 from Crypto.Protocol.KDF import PBKDF2
-from Crypto import Random
 
 BAD_HMAC = 1
 BAD_ARGS = 2
@@ -96,8 +95,8 @@ class PassLocker:
         
         aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, iterations=self.iterations)
         hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
-        self.aes_key = Random.new().read(16)
-        self.hmac_key = Random.new().read(16)
+        self.aes_key = secrets.token_bytes(16)
+        self.hmac_key = secrets.token_bytes(16)
         ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
         master = {
             "algorithm" : "aes-256-cbc",
@@ -164,7 +163,7 @@ class PassLocker:
         """
         if salt is None:
                 # Generate a random 16-byte salt
-                salt = Random.new().read(16)
+                salt = secrets.token_bytes(16)
 
         # Generate a 32-byte (256-bit) key from the password
         prf = lambda p,s: HMAC.new(p, s, SHA256).digest()
@@ -195,7 +194,7 @@ class PassLocker:
              returns (ciphertext, iv). Both values are byte strings.
         """
         # The IV should always be random
-        iv = Random.new().read(AES.block_size)
+        iv = secrets.token_bytes(AES.block_size)
         cipher = AES.new(key, AES.MODE_CFB, iv)
         ciphertext = cipher.encrypt(message)
         return (ciphertext, iv)
