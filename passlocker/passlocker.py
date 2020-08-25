@@ -250,6 +250,7 @@ class PassLocker:
         # timing still heavily dependent on os file caching
         files = os.listdir(self.dbdir)
         files = [ x for x in files if x.endswith(".json") ]
+        files = sorted(files, key=lambda x: os.stat(self.dbdir+'/'+x).st_mtime)
         #s2 = time.time()
         b64strs = [ x.split('/')[-1][0:-5] for x in files ]
         #s3 = time.time()

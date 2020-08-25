@@ -116,11 +116,14 @@ def edit_account(accname, username):
             acc = pl._load_account(accname, username)
             pprint(acc)
         elif cmd == 'get':
-            pw = pl.get_active_password(accname, username)
-            if type(pw) == str:
-                print(pw)
-            else:
-                print(pw.decode('UTF-8'))
+            try:
+                pw = pl.get_active_password(accname, username)
+                if type(pw) == str:
+                    print(pw)
+                else:
+                    print(pw.decode('UTF-8'))
+            except Exception as e:
+                print(e)
         elif cmd == 'addpw':
             password = getpass.getpass('Enter password for account, {accname}: '.format(accname=accname.decode('UTF-8')))
             if password == None or password == "":
