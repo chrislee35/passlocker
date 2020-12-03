@@ -84,7 +84,7 @@ def menu():
 
 def list_accounts():
     filt = input("search filter: ")
-    accs = pl.list_accounts()
+    accs = pl.list_accounts('\t')
     if filt:
         accs = [ x for x in accs if filt in str(x) ]
     item = 0
@@ -99,7 +99,7 @@ def list_accounts():
         help_list()
         cmd = pl_prompt("entry #", 0)
     i = int(cmd)
-    accname, username = accs[i].split(b' ', 1)
+    accname, username = accs[i].split(b'\t', 1)
     edit_account(accname, username)
     
 def edit_account(accname, username):
