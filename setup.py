@@ -12,7 +12,7 @@ setup(name='passlocker',
       author_email='python@chrisleephd.us',
       url='https://github.com/chrislee35/passlocker',
       packages=['passlocker'],
-      scripts=['bin/passlocker', 'bin/passlocker_cui', 'bin/passlocker_gui'],
+      scripts=['bin/passlocker', 'bin/passlocker_cui', 'bin/passlocker_gui', 'bin/passlocker_rename'],
       install_requires=requirements,
       classifiers=[
               "Development Status :: 3 - Alpha",
