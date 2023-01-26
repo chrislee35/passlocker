@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-import base64
 from base64 import b64encode as b64encode
 from base64 import b64decode as b64decode
 from base64 import b32decode as b32decode
-import json, sys, os, time, glob, getpass, secrets
+import json
+import sys
+import os
+import time
+import getpass
+import secrets
 
 try:
-        import Crypto
+    from Crypto.Cipher import AES
+    from Crypto.Hash import HMAC, SHA256, SHA, MD5
+    from Crypto.Protocol.KDF import PBKDF2
 except ImportError:
-        print("Error: PyCrypto is not installed. You should be able to install it with \`pip\`. On Fedora and Ubuntu, the pip package is called \`python3-pip\`, so you should be able to run:\n    sudo apt-get install python3-pip # if you have Ubuntu\n    sudo yum install python3-pip # if you have Fedora\n    sudo python3-pip install pycrypto")
-        sys.exit(1)
-
-from Crypto.Cipher import AES
-from Crypto.Hash import HMAC, SHA256, SHA, MD5
-from Crypto.Protocol.KDF import PBKDF2
+    print("Error: PyCrypto is not installed. You should be able to install it with \`pip\`. On Fedora and Ubuntu, the pip package is called \`python3-pip\`, so you should be able to run:\n    sudo apt-get install python3-pip # if you have Ubuntu\n    sudo yum install python3-pip # if you have Fedora\n    sudo python3-pip install pycrypto")
+    sys.exit(1)
 
 BAD_HMAC = 1
 BAD_ARGS = 2
@@ -25,7 +27,7 @@ def b64e(b):
     return b64encode(b).decode('UTF-8')
     
 def b32d(s):
-    return b32decode(s.encode('UTF-8'))
+    return b32decode(s.encode('UTF-8').upper())
 
 class PassLocker:
     def __init__(self, master_password, **kwargs):
@@ -297,7 +299,7 @@ class PassLocker:
         elif type(password) == bytes:
             encoding = 'bytes'
         else:
-            raise Exception("I don't know how to encrypt a password of type %s" % type(pasword))
+            raise Exception("I don't know how to encrypt a password of type %s" % type(password))
     
         ciphertext, iv = PassLocker.encrypt(password, self.aes_key)
         hmac = PassLocker.make_hmac(ciphertext, self.hmac_key)

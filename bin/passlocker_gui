@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from passlocker import PassLocker
-import os, sys, base64
 import wx
 import wx.grid as gridlib
 import secrets
@@ -320,7 +319,7 @@ class PassLockerGui(wx.Frame):
         
         textField = wx.TextCtrl(pnl)
         self.Bind(wx.EVT_TEXT, self.OnChange, textField)
-        self.Bind(wx.EVT_CHAR, self.OnKeyPress, textField)
+        self.searchField = textField
 
         # create a menu bar
         self.makeMenuBar()
@@ -412,6 +411,27 @@ class PassLockerGui(wx.Frame):
         sizer.Fit(self)
         myGrid.Bind(gridlib.EVT_GRID_CELL_LEFT_CLICK, self.OnCellLeftClick)
         self.grid = myGrid
+        
+    def filterPasswords(self):
+        myGrid = self.grid
+        myGrid.ClearGrid()
+        
+        accs = self.pl.list_accounts()
+        filt = self.searchField.Value
+        accs.sort()
+        
+        row = 0
+        for acc in accs:
+            accountName, userName = acc.decode('UTF-8').split(' ', 1)
+            if filt and not (filt in accountName or filt in userName):
+                continue
+            myGrid.SetCellValue(row, 0, accountName)
+            myGrid.SetCellValue(row, 1, userName)
+            myGrid.SetReadOnly(row, 0, True)
+            myGrid.SetReadOnly(row, 1, True)
+            row += 1
+            
+        myGrid.AutoSizeColumns()        
 
     def OnCellLeftClick(self, evt):
         #print("OnCellLeftClick: (%d,%d) %s\n" % (evt.GetRow(), evt.GetCol(), evt.GetPosition()))
@@ -459,10 +479,7 @@ class PassLockerGui(wx.Frame):
                       wx.OK|wx.ICON_INFORMATION)
 
     def OnChange(self, event):
-        print(event)
-        
-    def OnKeyPress(self, event):
-        print(event)
+        self.filterPasswords()
 
 if __name__ == "__main__":
     app = wx.App()
