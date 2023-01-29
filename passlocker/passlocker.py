@@ -9,6 +9,8 @@ import time
 import getpass
 import secrets
 
+xrange = range
+
 try:
     from Crypto.Cipher import AES
     from Crypto.Hash import HMAC, SHA256, SHA, MD5
@@ -58,9 +60,8 @@ class PassLocker:
         self.timing = time.time() - starttime
             
     def _check_master_password(self, checkfile, master_password):
-        fh = open(checkfile, 'r')
-        master = json.load(fh)
-        fh.close()
+        with open(checkfile, 'r') as fh:
+            master = json.load(fh)
         
         salt = b64d(master['salt'])
         iterations = master['iterations']
@@ -108,9 +109,9 @@ class PassLocker:
             'ciphertext' : b64e(ciphertext),
             'iv' : b64e(iv)
         }
-        fh = open(checkfile, 'w')
-        json.dump(master, fh)
-        fh.close()
+        with open(checkfile, 'w') as fh:
+            json.dump(master, fh)
+
         self.unlocked = True
         
     def _to_db(self, account, username):
@@ -126,9 +127,8 @@ class PassLocker:
         if not os.path.exists(account_file):
             raise Exception("Cannot find entry for %s" % account_name)
     
-        fh = open(account_file, "r")
-        acc = json.load(fh)
-        fh.close()
+        with open(account_file, "r") as fh:
+            acc = json.load(fh)
         
         return acc
         
@@ -138,9 +138,8 @@ class PassLocker:
         if kwargs.get('overwrite', True) == False and os.path.exists(account_file):
             raise Exception("Entry for %s (%s) already exists" % (account_name, account['username']))
     
-        fh = open(account_file, "w")
-        json.dump(account, fh)
-        fh.close()
+        with open(account_file, "w") as fh:
+            json.dump(account, fh)
         
     def _unlink_account(self, account_name, username):
         account_file = self._to_db(account_name, username)
@@ -242,9 +241,8 @@ class PassLocker:
             'iv' : b64e(iv)
         }
         checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
-        fh = open(checkfile, 'w')
-        json.dump(master, fh)
-        fh.close()
+        with open(checkfile, 'w') as fh:
+            json.dump(master, fh)
         
     def list_accounts(self, sep=' '):
         #s1 = time.time()
