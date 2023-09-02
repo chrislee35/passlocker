@@ -68,8 +68,9 @@ class PassLocker:
         
         # derive from the password the master-key-decryption-key 
         # (and the password-derived hmac), decrypt the master-key (and master-hmac)
-        aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, salt=salt, iterations=iterations)        
+        aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, salt=salt, iterations=iterations)
         hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
+              
         if master['hmac'] != hmac:
             raise Exception("Master password is incorrect.")
             

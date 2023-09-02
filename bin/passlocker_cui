@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 from passlocker import PassLocker
 import getpass
-import argparse
-import configparser
-import os, sys, base64, traceback
+import os
+import sys
+import base64
 from binascii import unhexlify
 from pprint import pprint
 import secrets
+from colorama import Fore, Style
 
 password = None
 dbdir = '%s/.passlocker' % os.environ['HOME']
@@ -49,36 +50,38 @@ def pl_prompt(message, default="", options=None):
         if options:
             if a in options:
                 return a
+            if a in [o[0] for o in options]:
+                return a
         else:
             return a
         
 def help_main():
     print("""help    prints out this help message
-list    list password entries
-add     creates a new password entry
-genpass randomly generates passwords
-exit    exits the tool""")
+l    list password entries
+a    creates a new password entry
+gp   randomly generates passwords
+exit exits the tool""")
 
 def help_list():
     print("""help   prints out this help message
-info   provides information about a password entry
-get    retrieves password for a password entry
-addpw  adds or updates the password for a password entry
-del    deletes a password entry
-note   add a note to the password entry
-exit   returns to the top menu""")
+i    provides information about a password entry
+g    retrieves password for a password entry
+a    adds or updates the password for a password entry
+d    deletes a password entry
+n    add a note to the password entry
+exit returns to the top menu""")
 
 def menu():
-    cmd = pl_prompt("Main menu", "exit", ["list","add","genpass","help","exit"])
-    if cmd == 'help':
+    cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "help", "exit"])
+    if cmd in ["help", 'h']:
         help_main()
-    elif cmd == 'list':
+    elif cmd in ["list", "l"]:
         list_accounts()
-    elif cmd == 'add':
+    elif cmd in ["add", 'a']:
         add_account()
-    elif cmd == 'genpass':
+    elif cmd in ["genpass", 'g']:
         generate_password_menu()
-    elif cmd == 'exit':
+    elif cmd in ['exit', 'e']:
         return False
     return True
 
@@ -95,7 +98,7 @@ def list_accounts():
         print(str(item)+"\t"+acc.decode('UTF-8'))
         item += 1
     cmd = pl_prompt("entry #", 0)
-    while cmd == 'help':
+    while cmd == 'h':
         help_list()
         cmd = pl_prompt("entry #", 0)
     i = int(cmd)
@@ -109,46 +112,47 @@ def edit_account(accname, username):
         username = username.encode('UTF-8')
         
     while True:
-        cmd = pl_prompt("%s %s" % (accname.decode('UTF-8'), username.decode('UTF-8')), "exit", ["help","info","get","addpw","del","exit","note"])
-        if cmd == 'help':
+        cmd = pl_prompt("%s %s" % (accname.decode('UTF-8'), username.decode('UTF-8')), "exit", 
+                        ["help","info","get","addpw","del","exit","note"])
+        if cmd in ["help", 'h']:
             help_list()
-        elif cmd == 'info':
+        elif cmd in ["info", 'i']:
             acc = pl._load_account(accname, username)
             pprint(acc)
-        elif cmd == 'get':
+        elif cmd in ["get", 'g']:
             try:
                 pw = pl.get_active_password(accname, username)
                 if type(pw) == str:
-                    print(pw)
+                    print(Fore.RED+pw+Style.RESET_ALL)
                 else:
                     print(pw.decode('UTF-8'))
             except Exception as e:
                 print(e)
-        elif cmd == 'addpw':
+        elif cmd in ["addpw", 'a']:
             password = getpass.getpass('Enter password for account, {accname}: '.format(accname=accname.decode('UTF-8')))
             if password == None or password == "":
                 return
             pl.add_password(accname, username, password)
-        elif cmd == 'del':
+        elif cmd in ["del", 'd']:
             confirm = pl_prompt('Delete account (yes|no)', 'no')
-            if confirm and confirm.lower() == 'yes':
+            if confirm and confirm.lower() in ['yes', 'y'] :
                 deleted = pl.del_account(accname, username)
                 if deleted:
                     print("Account, {accname}, deleted.".format(accname=accname.decode('UTF-8')))
                     return
                 else:
                     print("Cound not delete {accname}".format(accname=accname.decode('UTF-8')))
-        elif cmd == 'note':
+        elif cmd in ["note", 'n']:
             note = input("Note: ")
             if note and len(note) > 0:
                 pl.add_note(accname, username, note)
-        elif cmd == 'exit':
+        elif cmd in ['exit', 'e']:
             return
         
 def add_account():
     try:
         acctype = pl_prompt("Which account type?", "password", ["password", "otp", "totp"])
-        if acctype == "password":
+        if acctype in ["password", "pw", "p"]:
             add_password_account()
         elif acctype == "otp":
             add_otp_account()
@@ -230,7 +234,8 @@ def add_totp_account():
     edit_account(accname, username)
 
 def del_account():
-    accname, username = get_account_and_username()
+    accname = next_word() or pl_prompt("Account name?")
+    username = next_word() or pl_prompt("Username")
     confirm = next_word()
     if confirm == None:
         confirm = pl_prompt('Delete account (yes|no)', 'no')
