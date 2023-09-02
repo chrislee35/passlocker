@@ -32,33 +32,31 @@ def b32d(s):
     return b32decode(s.encode('UTF-8').upper())
 
 class PassLocker:
-    def __init__(self, master_password, **kwargs):
+    def __init__(self, password_cb, **kwargs):
         self.dbdir = kwargs.get('dbdir', os.environ['HOME']+"/.passlocker")
         self.iterations = kwargs.get('iterations', 100000)
         if not os.path.exists(self.dbdir):
             os.mkdir(self.dbdir)
         self.unlocked = False
-        self.master_password = master_password
+        self.password_cb = password_cb
 
     def _unlock(self):
         if self.unlocked:
             return
+        
         starttime = time.time()
         checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
-        if str(type(self.master_password)) in ["<class 'function'>", "<class 'method'>", "<type 'function'>", "<type 'method'>"]:
-            self.master_password = self.master_password()
-        if type(self.master_password) == str:
-            self.master_password = self.master_password.encode('UTF-8')
-            
+        master_password = self.password_cb()
+
         if os.path.exists(checkfile):
-            self._check_master_password(checkfile, self.master_password)
+            self._check_master_password(checkfile, master_password)
         else:
-            self._initialize_master_password(checkfile, self.master_password)
-        # this doesn't erase the password from memory, but it does make it harder to access
-        self.master_password = None 
+            self._initialize_master_password(checkfile, master_password)
+
+        del(master_password)
         self.unlocked = True
         self.timing = time.time() - starttime
-            
+
     def _check_master_password(self, checkfile, master_password):
         with open(checkfile, 'r') as fh:
             master = json.load(fh)
@@ -114,7 +112,7 @@ class PassLocker:
             json.dump(master, fh)
 
         self.unlocked = True
-        
+
     def _to_db(self, account, username):
         if type(account) == str:
             account = account.encode('UTF-8')
@@ -214,9 +212,10 @@ class PassLocker:
         msg = cipher.decrypt(ciphertext)
         return msg
 
-    def change_master_password(self, new_password):
+    def change_master_password(self):
         self._unlock()
                 
+        new_password = self.password_cb()
         if len(new_password) < 20:
             print("Your password is less than 20 characters.    To proceed with this week password, please type: weak password")
             ans = input("> ")

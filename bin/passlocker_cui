@@ -57,22 +57,23 @@ def pl_prompt(message, default="", options=None):
         
 def help_main():
     print("""help    prints out this help message
-l    list password entries
-a    creates a new password entry
-gp   randomly generates passwords
-exit exits the tool""")
+list    list password entries
+add     creates a new password entry
+genpass randomly generates passwords
+chpass  change the master password
+exit    exits the tool""")
 
 def help_list():
     print("""help   prints out this help message
-i    provides information about a password entry
-g    retrieves password for a password entry
-a    adds or updates the password for a password entry
-d    deletes a password entry
-n    add a note to the password entry
-exit returns to the top menu""")
+info    provides information about a password entry
+get     retrieves password for a password entry
+addpw   adds or updates the password for a password entry
+del     deletes a password entry
+note    add a note to the password entry
+exit    returns to the top menu""")
 
 def menu():
-    cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "help", "exit"])
+    cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "chpass", "help", "exit"])
     if cmd in ["help", 'h']:
         help_main()
     elif cmd in ["list", "l"]:
@@ -81,6 +82,8 @@ def menu():
         add_account()
     elif cmd in ["genpass", 'g']:
         generate_password_menu()
+    elif cmd in ["chpass", "c"]:
+        pl.change_master_password()
     elif cmd in ['exit', 'e']:
         return False
     return True
@@ -247,7 +250,7 @@ def del_account():
             print("Cound not delete {accname}".format(accname=accname))
 
 def get_master_password():
-    return getpass.getpass(prompt="Master password: ")
+    return getpass.getpass(prompt="Master password: ").encode('UTF-8')
 
 def generate_password_menu():
     gentype = pl_prompt("Password type", "memorable", ["memorable", "random", "numbers"])
