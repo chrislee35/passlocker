@@ -335,7 +335,7 @@ class PassLockerGui(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             password = dlg.GetValue()
         #dlg.Destroy()
-        return password
+        return password.encode("UTF-8")
 
     def makeMenuBar(self):
         """
