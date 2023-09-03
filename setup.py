@@ -16,7 +16,7 @@ setup(name='passlocker',
       install_requires=requirements,
       classifiers=[
               "Development Status :: 3 - Alpha",
-              "Topic :: Utilities",
+              "Topic :'': Utilities",
               "License :: OSI Approved :: MIT License",
           ],
       
