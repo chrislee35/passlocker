@@ -4,6 +4,7 @@ import getpass
 import os
 import sys
 import base64
+import pyperclip
 from binascii import unhexlify
 from pprint import pprint
 import secrets
@@ -116,7 +117,7 @@ def edit_account(accname, username):
         
     while True:
         cmd = pl_prompt("%s %s" % (accname.decode('UTF-8'), username.decode('UTF-8')), "exit", 
-                        ["help","info","get","addpw","del","exit","note"])
+                        ["help","info","get","copy","addpw","del","exit","note"])
         if cmd in ["help", 'h']:
             help_list()
         elif cmd in ["info", 'i']:
@@ -128,7 +129,16 @@ def edit_account(accname, username):
                 if type(pw) == str:
                     print(Fore.RED+pw+Style.RESET_ALL)
                 else:
-                    print(pw.decode('UTF-8'))
+                    print(Fore.RED+pw.decode('UTF-8')+Style.RESET_ALL)
+            except Exception as e:
+                print(e)
+        elif cmd in ["copy", "c"]:
+            try:
+                pw = pl.get_active_password(accname, username)
+                if type(pw) == str:
+                    pyperclip.copy(pw)
+                else:
+                    pyperclip.copy(pw.decode('UTF-8'))
             except Exception as e:
                 print(e)
         elif cmd in ["addpw", 'a']:

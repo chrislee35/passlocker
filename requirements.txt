@@ -1,3 +1,2 @@
 pycryptodome
-configparser
-wxPython
+pyperclip

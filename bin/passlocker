@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from passlocker import PassLocker
 import getpass
-import argparse
-import configparser
-import os, sys, base64, traceback
+import os
+import sys
+import base64
 from binascii import unhexlify
 
 password = None
@@ -97,6 +97,7 @@ def get_account_and_username():
 def account_info():
     accname, username = get_account_and_username()
     acc = pl._load_account(accname, username)
+    print(acc)
 
 def get_password():
     accname, username = get_account_and_username()
@@ -270,23 +271,23 @@ def change_password():
     
 def process():
     cmd = next_word()
-    if cmd == "list":
+    if cmd in ["list", "l"]:
         list_accounts()
-    elif cmd == "info":
+    elif cmd in ["info", "i"]:
         account_info()
-    elif cmd == "get":
+    elif cmd in ["get", "g"]:
         get_password()
-    elif cmd == "add":
+    elif cmd in ["add", "a"]:
         add_account()
-    elif cmd == "del":
+    elif cmd in ["del", "d"]:
         del_account()
-    elif cmd == "pw":
+    elif cmd in ["pw", "p"]:
         add_password()
-    elif cmd == "note":
+    elif cmd in ["note", "n"]:
         add_note()
-    elif cmd == "chgpass":
+    elif cmd in ["chgpass", "c"]:
         change_password()
-    elif cmd == "help":
+    elif cmd in ["help", "h"]:
         help("interactive")
     else:
         print("Unknown command: %s" % cmd)
@@ -315,7 +316,7 @@ if cmd == "interactive":
                 sys.exit(0)
             words = csv.reader([line], delimiter=' ').__next__()
             process()
-        except EOFError as e:
+        except EOFError:
             print("")
             sys.exit(0)
 elif cmd == "script":
