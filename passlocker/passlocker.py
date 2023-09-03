@@ -6,7 +6,6 @@ import json
 import sys
 import os
 import time
-import getpass
 import secrets
 
 xrange = range
@@ -46,7 +45,7 @@ class PassLocker:
         
         starttime = time.time()
         checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
-        master_password = self.password_cb()
+        master_password = self.password_cb("Master password: ")
 
         if os.path.exists(checkfile):
             self._check_master_password(checkfile, master_password)
@@ -86,7 +85,7 @@ class PassLocker:
             ans = input("> ")
             if ans.strip().lower() != "weak password":
                 sys.exit(0)
-        verify = getpass.getpass("Verify password: ")
+        verify = self.password_cb("Verify password: ")
         if verify != master_password:
             print("Passwords do not match. Bailing out.")
             sys.exit(0)
@@ -368,7 +367,7 @@ class PassLocker:
             
             output_data = str(binary)[-acc['num_digits']:].encode('UTF-8')
             
-        if kwargs.get('decode'):
+        if kwargs.get('decode') and type(output_data) != str:
             output_data = output_data.decode(kwargs['decode'])
         elif type(output_data) != str:
             output_data = output_data.decode('UTF-8')

@@ -259,8 +259,8 @@ def del_account():
         else:
             print("Cound not delete {accname}".format(accname=accname))
 
-def get_master_password():
-    return getpass.getpass(prompt="Master password: ").encode('UTF-8')
+def get_master_password(prompt):
+    return getpass.getpass(prompt=prompt).encode('UTF-8')
 
 def generate_password_menu():
     gentype = pl_prompt("Password type", "memorable", ["memorable", "random", "numbers"])

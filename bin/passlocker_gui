@@ -329,8 +329,8 @@ class PassLockerGui(wx.Frame):
         self.CreateStatusBar()
         self.SetStatusText("Welcome to PassLocker GUI!")
                 
-    def get_master_password(self): 
-        dlg = wx.PasswordEntryDialog(self, 'Enter Master Password', 'Master Password') 
+    def get_master_password(self, prompt): 
+        dlg = wx.PasswordEntryDialog(self, prompt, 'Master Password') 
         password = ''
         if dlg.ShowModal() == wx.ID_OK:
             password = dlg.GetValue()
