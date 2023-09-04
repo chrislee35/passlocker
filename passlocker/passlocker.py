@@ -12,7 +12,7 @@ xrange = range
 
 try:
     from Crypto.Cipher import AES
-    from Crypto.Hash import HMAC, SHA256, SHA, MD5
+    from Crypto.Hash import HMAC, SHA256, SHA, MD5, SHA512
     from Crypto.Protocol.KDF import PBKDF2
 except ImportError:
     print("Error: PyCrypto is not installed. You should be able to install it with \`pip\`. On Fedora and Ubuntu, the pip package is called \`python3-pip\`, so you should be able to run:\n    sudo apt-get install python3-pip # if you have Ubuntu\n    sudo yum install python3-pip # if you have Fedora\n    sudo python3-pip install pycrypto")
@@ -351,14 +351,17 @@ class PassLocker:
             now = kwargs.get('now', time.time())
             tc = int((now - acc["epoch_start"])/acc["time_interval"])
             tc = tc.to_bytes(8, 'big')
-            if acc['hash_algorithm'] == 'sha1':
+            ha = acc['hash_algorithm']
+            if ha == 'sha1':
                 algo = SHA
-            elif acc['hash_algorithm'] == 'md5':
+            elif ha == 'md5':
                 algo = MD5
-            elif acc['hash_algorithm'] == 'sha256':
+            elif ha == 'sha256':
                 algo = SHA256
+            elif ha == 'sha512':
+                algo = SHA512
             else:
-                raise Exception('unsupported hash algorithm, contact module author')
+                raise Exception(f'unsupported hash algorithm, {ha}. contact module author')
             # http://pike.lysator.liu.se/docs/ietf/rfc/62/rfc6238.xml
             hmac = HMAC.new(output_data, tc, algo)
             output = hmac.digest()
