@@ -74,7 +74,7 @@ note    add a note to the password entry
 exit    returns to the top menu""")
 
 def menu():
-    cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "chpass", "help", "exit"])
+    cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "chpass", "clear", "help", "exit"])
     if cmd in ["help", 'h']:
         help_main()
     elif cmd in ["list", "l"]:
@@ -87,6 +87,8 @@ def menu():
         pl.change_master_password()
     elif cmd in ['exit', 'e']:
         return False
+    elif cmd in ["clear"]:
+        os.system("clear")
     return True
 
 def list_accounts():
@@ -117,7 +119,7 @@ def edit_account(accname, username):
         
     while True:
         cmd = pl_prompt("%s %s" % (accname.decode('UTF-8'), username.decode('UTF-8')), "exit", 
-                        ["help","info","get","copy","addpw","del","exit","note"])
+                        ["help","info","get","copy","addpw","del","exit","note", "clear"])
         if cmd in ["help", 'h']:
             help_list()
         elif cmd in ["info", 'i']:
@@ -159,6 +161,8 @@ def edit_account(accname, username):
             note = input("Note: ")
             if note and len(note) > 0:
                 pl.add_note(accname, username, note)
+        elif cmd in ["clear"]:
+            os.system("clear")
         elif cmd in ['exit', 'e']:
             return
         
