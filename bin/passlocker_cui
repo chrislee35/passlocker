@@ -46,8 +46,11 @@ def pl_prompt(message, default="", options=None):
         a = input('%s: [%s] ' % (message, str(default)))
         if a == None or a == "":
             a = default
+        try:
+            a = type(default)(a)
+        except ValueError:
+            return default
         
-        a = type(default)(a)
         if options:
             if a in options:
                 return a
