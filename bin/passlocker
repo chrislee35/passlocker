@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from passlocker import PassLocker
-import getpass
+import pwinput
 import os
 import sys
 import base64
@@ -128,7 +128,7 @@ def add_password_account():
     if password:
         if password == '-':
             encoding = 'raw'
-            password = getpass.getpass('Enter password for account, %s %s (%s): ' % (accname, username, encoding))
+            password = pwinput.pwinput('Enter password for account, %s %s (%s): ' % (accname, username, encoding), mask='*')
             if password == None or password == "":
                 sys.exit(0)
             password = dec(password, encoding)
@@ -219,7 +219,7 @@ def add_password():
                 pl.add_password(accname, username, password)
         else:
             encoding = 'raw'
-            password = getpass.getpass('Enter password for account, %s (%s): ' % (accname, encoding))
+            password = pwinput.pwinput('Enter password for account, %s (%s): ' % (accname, encoding), mask='*')
             if password == None or password == "":
                 sys.exit(0)
             password = dec(password, encoding)
@@ -228,12 +228,12 @@ def add_password():
         index = 1
         if len(passwords) == 0:
             print("Enter OTP passwords, one per line using %s encoding.    Use an empty line to finish." % encoding)
-            password = getpass.getpass('%d: ' % index)
+            password = pwinput.pwinput('%d: ' % index, mask='*')
             while password != None and password != "":
                 password = dec(password, encoding)
                 passwords.append(password)
                 index += 1
-                password = getpass.getpass('%d: ' % index)
+                password = pwinput.pwinput('%d: ' % index, mask='*')
         if len(passwords) > 0:
             if len(passwords) > 3:
                 print("Please be patient.    Encrypting many passwords will take time.")
@@ -248,7 +248,7 @@ def add_password():
                 password = dec(password, encoding)
                 pl.add_password(accname, username, password)
         else:
-            password = getpass.getpass('Enter secret for TOTP account, %s (%s): ' % (accname, encoding))
+            password = pwinput.pwinput('Enter secret for TOTP account, %s (%s): ' % (accname, encoding), mask='*')
             password = dec(password, encoding)
             pl.add_password(accname, username, password)
      
@@ -262,8 +262,8 @@ def add_note():
     pl.add_note(accname, username, note)
 
 def change_password():
-    new_password = getpass.getpass(prompt="New master password: ")
-    verify = getpass.getpass(prompt="Verify new password: ")
+    new_password = pwinput.pwinput(prompt="New master password: ", mask='*')
+    verify = pwinput.pwinput(prompt="Verify new password: ", mask='*')
     if new_password == verify:
         pl.change_master_password(new_password)
     else:
@@ -303,7 +303,7 @@ if cmd == "help":
     sys.exit(0)
 
 def get_master_password():
-    return getpass.getpass(prompt="Master password: ")
+    return pwinput.pwinput(prompt="Master password: ", mask='*')
 
 pl = PassLocker(get_master_password)
 
