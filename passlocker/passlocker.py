@@ -15,7 +15,7 @@ try:
     from Crypto.Hash import HMAC, SHA256, SHA, MD5, SHA512
     from Crypto.Protocol.KDF import PBKDF2
 except ImportError:
-    print("Error: PyCrypto is not installed. You should be able to install it with \`pip\`. On Fedora and Ubuntu, the pip package is called \`python3-pip\`, so you should be able to run:\n    sudo apt-get install python3-pip # if you have Ubuntu\n    sudo yum install python3-pip # if you have Fedora\n    sudo python3-pip install pycrypto")
+    print("Error: PyCrypto is not installed. You should be able to install it with pip. On Fedora and Ubuntu, the pip package is called python3-pip, so you should be able to run:\n    sudo apt-get install python3-pip # if you have Ubuntu\n    sudo yum install python3-pip # if you have Fedora\n    sudo python3-pip install pycrypto")
     sys.exit(1)
 
 BAD_HMAC = 1
@@ -483,5 +483,11 @@ class PassLocker:
         return output_data
         
         
-        
+    def rename_account(self, account_name, username, new_account_name, new_username):
+        acc = self._load_account(account_name, username)
+        if not acc: return
+        acc["account"] = new_account_name
+        acc["username"] = new_username
+        self._write_account(acc)
+        self._unlink_account(account_name, username)
         

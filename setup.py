@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
     requirements = f.read().splitlines()
     
 setup(name='passlocker',
-      version='0.0.8',
+      version='0.0.9',
       description='Password Encryption',
       author='Chris Lee',
       author_email='python@chrisleephd.us',
