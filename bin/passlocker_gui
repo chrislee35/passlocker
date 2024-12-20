@@ -438,10 +438,15 @@ class PassLockerGui(wx.Frame):
         accname = self.grid.GetCellValue(evt.GetRow(), 0)
         username = self.grid.GetCellValue(evt.GetRow(), 1)
         evt.Skip()
-        pw = self.pl.get_active_password(accname, username)
-        dlg = wx.MessageDialog(self, pw, 'Password')
-        dlg.ShowModal()
-        dlg.Destroy()
+        try:
+            pw = self.pl.get_active_password(accname, username)
+            dlg = wx.MessageDialog(self, pw, 'Password')
+            dlg.ShowModal()
+            dlg.Destroy()
+        except Exception as e:
+            dlg = wx.MessageDialog(self, str(e), 'Error', style=wx.ICON_EXCLAMATION)
+            dlg.ShowModal()
+            dlg.Destroy()
         
 
     def OnExit(self, event):
