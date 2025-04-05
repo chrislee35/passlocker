@@ -447,12 +447,10 @@ class PassLockerGui(wx.Frame):
             dlg = wx.MessageDialog(self, str(e), 'Error', style=wx.ICON_EXCLAMATION)
             dlg.ShowModal()
             dlg.Destroy()
-        
 
     def OnExit(self, event):
         """Close the frame, terminating the application."""
         self.Close(True)
-
 
     def OnNewAccount(self, event):
         dlg = NewAccountDialog(self, 'New Account')

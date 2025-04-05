@@ -12,7 +12,16 @@ class PassLockerTest(unittest.TestCase):
             os.unlink('db/.check')
             
     def get_master_pw(self, prompt):
-            return "mastermastermastermaster".encode('UTF-8')
+        return "mastermastermastermaster098345729834765938".encode('UTF-8')
+
+    def get_pwned_pw(self, prompt):
+        return "passwordpassword123456".encode('UTF-8')
+
+    def test_pwned_password(self):
+        with self.assertRaises(Exception):
+            pl = PassLocker(self.get_pwned_pw, iterations=10, dbdir='db/') # for testing
+            pl.add_account("test", "chris")
+            pl.add_password("test", "chris", b"password")
         
     def test_regular_password(self):
         pl = PassLocker(self.get_master_pw, iterations=10, dbdir='db/') # for testing

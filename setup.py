@@ -9,7 +9,7 @@ setup(name='passlocker',
     author_email='python@chrisleephd.us',
     url='https://github.com/chrislee35/passlocker',
     packages=['passlocker'],
-    scripts=['bin/passlocker', 'bin/passlocker_cui', 'bin/passlocker_rename'],
+    scripts=['bin/passlocker', 'bin/passlocker_cui'],
     install_requires=[
         "pycryptodome",
         "pyperclip",
@@ -17,7 +17,8 @@ setup(name='passlocker',
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "Topic :'': Utilities",
-        "License :: OSI Approved :: MIT License",
-    ]
+        "Topic :'': Utilities"
+    ],
+    license = "CC-BY-NC-SA-4.0",
+    license_files = ['LICENSE']
 )

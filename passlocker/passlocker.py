@@ -7,6 +7,9 @@ import sys
 import os
 import time
 import secrets
+import requests
+from random import randint as ri
+from hashlib import sha1
 
 xrange = range
 
@@ -33,9 +36,11 @@ def b32d(s):
 class PassLocker:
     def __init__(self, password_cb, **kwargs):
         self.dbdir = kwargs.get('dbdir', os.environ['HOME']+"/.passlocker")
-        self.iterations = kwargs.get('iterations', 100000)
+        # I randomize the number of iterations to make lookup tables a lot harder to build
+        self.iterations = kwargs.get('iterations', ri(100000-100, 100000+100))
         if not os.path.exists(self.dbdir):
             os.mkdir(self.dbdir)
+            os.chmod(self.dbdir, 0o700)
         self.unlocked = False
         self.password_cb = password_cb
 
@@ -85,6 +90,11 @@ class PassLocker:
             ans = input("> ")
             if ans.strip().lower() != "weak password":
                 sys.exit(0)
+        
+        if self.check_pwnedpasswords(master_password):
+            print("This password is listed in pwnedpasswords.com.  Please try a different password.")
+            raise Exception("This password is listed in pwnedpasswords.com.  Please try a different password.")
+        
         verify = self.password_cb("Verify password: ")
         if verify != master_password:
             print("Passwords do not match. Bailing out.")
@@ -109,8 +119,25 @@ class PassLocker:
         }
         with open(checkfile, 'w') as fh:
             json.dump(master, fh)
+            os.chmod(checkfile, 0o600)
 
         self.unlocked = True
+
+    def check_pwnedpasswords(self, master_password: str) -> bool:
+        if type(master_password) == str:
+            master_password = master_password.encode('UTF-8')
+        hash = sha1(master_password).hexdigest().upper()
+        prefix = hash[0:5]
+        suffix = hash[5:]
+        url = f"https://api.pwnedpasswords.com/range/{prefix}"
+        with requests.Session() as session:
+            req = session.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+            body = req.content.decode('UTF-8')
+            for line in body.split('\n'):
+                check = line.split(':',1)[0]
+                if check == suffix:
+                    return True
+        return False
 
     def _to_db(self, account, username):
         if type(account) == str:
@@ -138,6 +165,7 @@ class PassLocker:
     
         with open(account_file, "w") as fh:
             json.dump(account, fh)
+            os.chmod(account_file, 0o600)
         
     def _unlink_account(self, account_name, username):
         account_file = self._to_db(account_name, username)
@@ -242,6 +270,7 @@ class PassLocker:
         checkfile = "{dbdir}/.check".format(dbdir=self.dbdir)
         with open(checkfile, 'w') as fh:
             json.dump(master, fh)
+            os.chmod(checkfile, 0o600)
         
     def list_accounts(self, sep=' '):
         #s1 = time.time()
@@ -405,11 +434,15 @@ class PassLocker:
         acc['notes'].append(note)
         self._write_account(acc)
         
-    def get_notes(self, account_name, username):
+    def get_notes(self, account_name, username) -> list[str]:
         acc = self._load_account(account_name, username)
         if acc.get('notes') == None:
             return []
         return acc.get('notes')
+
+    def get_type(self, account_name: bytes, username: bytes) -> str:
+        acc = self._load_account(account_name, username)
+        return acc["type"]
         
     def change_user(self, account_name, from_user, to_user):
         # users are plain text (for now.    I might change this in the future)
@@ -482,12 +515,14 @@ class PassLocker:
             output_data = output_data.decode(q_entry['encoding'])
         return output_data
         
-        
     def rename_account(self, account_name, username, new_account_name, new_username):
         acc = self._load_account(account_name, username)
         if not acc: return
         acc["account"] = new_account_name
         acc["username"] = new_username
-        self._write_account(acc)
-        self._unlink_account(account_name, username)
+        try:
+            self._write_account(acc, overwrite=False)
+            self._unlink_account(account_name, username)
+        except Exception as e:
+            print(e)
         

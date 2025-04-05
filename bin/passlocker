@@ -268,6 +268,11 @@ def change_password():
         pl.change_master_password(new_password)
     else:
         print("Passwords did not match.")
+
+def rename_account():
+    accname, username = get_account_and_username()
+    new_accname, new_username = get_account_and_username()
+    pl.rename_account(accname, username, new_accname, new_username)
     
 def process():
     cmd = next_word()
@@ -287,6 +292,8 @@ def process():
         add_note()
     elif cmd in ["chgpass", "c"]:
         change_password()
+    elif cmd in ["rename", "r"]:
+        rename_account()
     elif cmd in ["help", "h"]:
         help("interactive")
     else:
