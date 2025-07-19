@@ -83,6 +83,25 @@ class PassLocker:
         plaintext = PassLocker.decrypt(ciphertext, aes_key, iv)
         self.aes_key = plaintext[0:16]
         self.hmac_key = plaintext[16:32]
+
+    def _create_master_key_record(self, master_password) -> dict[str, str]:
+        # Take the master password, derive the master-key-encryption-key from it
+        # Then encrypt the master key with the password-derived key
+        # Do the same with the hmac
+        aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, iterations=self.iterations)
+        hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
+        self.aes_key = secrets.token_bytes(16)
+        self.hmac_key = secrets.token_bytes(16)
+        ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
+        master = {
+            "algorithm" : "aes-256-cbc",
+            'salt' : b64e(salt),
+            'iterations' : iterations,
+            'hmac' : hmac, # this comes out as a hex string
+            'ciphertext' : b64e(ciphertext),
+            'iv' : b64e(iv)
+        }
+        return master
             
     def _initialize_master_password(self, checkfile, master_password):
         if len(master_password) < 20:
@@ -99,24 +118,9 @@ class PassLocker:
         if verify != master_password:
             print("Passwords do not match. Bailing out.")
             sys.exit(0)
-                
-        # Take the master password, derive the master-key-encryption-key from it
-        # Then encrypt the master key with the password-derived key
-        # Do the same with the hmac
         
-        aes_key, hmac_key, salt, iterations = PassLocker.make_keys(master_password, iterations=self.iterations)
-        hmac = PassLocker.make_hmac(master_password+aes_key, hmac_key)
-        self.aes_key = secrets.token_bytes(16)
-        self.hmac_key = secrets.token_bytes(16)
-        ciphertext, iv = PassLocker.encrypt(self.aes_key+self.hmac_key, aes_key)
-        master = {
-            "algorithm" : "aes-256-cbc",
-            'salt' : b64e(salt),
-            'iterations' : iterations,
-            'hmac' : hmac, # this comes out as a hex string
-            'ciphertext' : b64e(ciphertext),
-            'iv' : b64e(iv)
-        }
+        master = self._create_master_key_record(master_password=master_password)
+        
         with open(checkfile, 'w') as fh:
             json.dump(master, fh)
             os.chmod(checkfile, 0o600)

@@ -115,8 +115,8 @@ class PassLockerTest(unittest.TestCase):
     def tearDown(self):
         for acc in glob.glob('db/*.json'):
             os.unlink(acc)
-        if os.path.exists('db/.check'):
-            os.unlink('db/.check')
+        #if os.path.exists('db/.check'):
+        #    os.unlink('db/.check')
 
 if __name__ == '__main__':
     unittest.main()

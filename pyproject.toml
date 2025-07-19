@@ -2,6 +2,39 @@
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "passlocker"
+version = "0.0.10"
+description = "Password Encryption"
+authors = [
+    { name = "Chris Lee", email = "github@chrislee.dhs.org" }
+]
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "CC-BY-NC-SA-4.0" }
+keywords = ["encryption", "passwords", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Topic :: Utilities",
+    "Programming Language :: Python :: 3 :: Only"
+]
+dependencies = [
+    "pycryptodome >= 3.21.0",
+    "pyperclip >= 1.9.0",
+    "pwinput >= 1.0.3"
+]
+
 [license]
 license = "CC-BY-NC-SA-4.0"
 license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/chrislee35/passlocker"
+
+[tool.setuptools]
+packages = ["passlocker"]
+
+[project.scripts]
+passlocker = "passlocker.cui"
+
+
