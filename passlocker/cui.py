@@ -213,7 +213,7 @@ exit    returns to the top menu""")
             elif cmd in ['exit', 'e']:
                 return
             
-    def add_account():
+    def add_account(self):
         try:
             acctype = pl_prompt("Which account type?", "password", ["password", "otp", "totp"])
             if acctype in ["password", "pw", "p"]:
@@ -229,10 +229,10 @@ exit    returns to the top menu""")
             print(e)
 
     def add_password_account(self):
-        accname = next_word() or pl_prompt("Account name?")
-        username = next_word() or pl_prompt("Username")
+        accname = self.next_word() or pl_prompt("Account name?")
+        username = self.next_word() or pl_prompt("Username")
         self.pl.add_account(accname, username, type='password')
-        password = next_word()
+        password = self.next_word()
         if password:
             if password == '-':
                 encoding = 'raw'
@@ -247,10 +247,10 @@ exit    returns to the top menu""")
             self.edit_account(accname, username)
         
     def add_otp_account(self):    
-        accname = next_word() or pl_prompt("Account name?")
-        username = next_word() or pl_prompt("Username")
+        accname = self.next_word() or pl_prompt("Account name?")
+        username = self.next_word() or pl_prompt("Username")
         self.pl.add_account(accname, username, type='otp')
-        password = next_word()
+        password = self.next_word()
         if password:
             acc = self.pl._load_account(accname, username)
             # there's a decision that is needed here.    If we add a batch of OTP passwords to
@@ -262,30 +262,30 @@ exit    returns to the top menu""")
                 pa = 1
             while password:
                 self.pl.add_password(accname, username, password)
-                password = next_word()
+                password = self.next_word()
             self.pl.set_active_password(accname, username, pa, skip=1)
         else:
             self.edit_account(accname, username)
 
     def add_totp_account(self):
-        accname = next_word() or pl_prompt("Account name?")
-        username = next_word() or pl_prompt("Username")
-        word = next_word()
+        accname = self.next_word() or pl_prompt("Account name?")
+        username = self.next_word() or pl_prompt("Username")
+        word = self.next_word()
         if word == None:
             epoch_start = pl_prompt('Start time (epoch seconds)', 0)
         else:
             epoch_start = int(word)
-        word = next_word()
+        word = self.next_word()
         if word == None:
             time_interval = pl_prompt('Time interval (seconds)', 30)
         else:
             time_interval = int(word)
-        word = next_word()
+        word = self.next_word()
         if word == None:
             num_digits = pl_prompt('Number of digits to return', 6)
         else:
             num_digits = int(word)
-        word = next_word()
+        word = self.next_word()
         if word == None or not word in ['sha1', 'md5', 'sha256']:
             hash_algorithm = pl_prompt('Which hash algorithm to use', 'sha1', ['sha1', 'md5', 'sha256'])
         else:
@@ -298,9 +298,9 @@ exit    returns to the top menu""")
         self.edit_account(accname, username)
 
     def del_account(self):
-        accname = next_word() or pl_prompt("Account name?")
-        username = next_word() or pl_prompt("Username")
-        confirm = next_word()
+        accname = self.next_word() or pl_prompt("Account name?")
+        username = self.next_word() or pl_prompt("Username")
+        confirm = self.next_word()
         if confirm == None:
             confirm = pl_prompt('Delete account (yes|no)', 'no')
         if confirm and confirm.lower() == 'yes':
