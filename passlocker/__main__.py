@@ -1,4 +1,4 @@
-from .cui import CUI
+from .cui import main
 
 if __name__ == '__main__':
-    CUI.main()
+    main()
