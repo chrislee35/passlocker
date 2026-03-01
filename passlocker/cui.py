@@ -1,4 +1,6 @@
+from typing import Any
 from _io import StringIO
+import colorama
 from qrcode import QRCode
 from typing import Callable, Literal, LiteralString, cast
 from passlocker.models.account import Account
@@ -11,6 +13,7 @@ import pyperclip
 from binascii import unhexlify
 from pprint import pprint
 import secrets
+import random
 from colorama import Fore, Style
 
 def dec(item: str, encoding: str='raw') -> bytes | str:
@@ -41,6 +44,30 @@ def pl_prompt(message: str, default: str = "", options: list[str] | None = None)
         else:
             return a
 
+
+def menu_prompt(message: str, default: str = "", menu: list[tuple[str, str, Callable, Any]]=[]) -> bool:
+    while True:
+        options: list[str] = []
+        for option, char, _, _ in menu:
+            if char and char in option:
+                option: str = option.replace(char, colorama.Fore.LIGHTMAGENTA_EX+char+colorama.Fore.RESET, 1)
+            options.append(option)
+        print(f"Options: [{','.join(options)}]")
+        a: str = input(f'{message}: [{default}] ')
+        if a == "":
+            a = default
+
+        for option, char, callback, args in menu:
+            if a == option or a == char:
+                if callback is None:
+                    return False
+                if args:
+                    callback(args)
+                else:
+                    callback()
+                return True
+
+
 def pl_prompt_int(message: str, default: int = 0) -> int:
     while True:
         a: str = input(f'{message}: [{default}] ')
@@ -63,6 +90,7 @@ class CUI:
         if password_callback is None:
             password_callback = self.get_master_password
         self.pl = PassLocker(password_callback, dbdir=self.dbdir)
+        self.dictionary: list[str] | None = None
 
     def next_word(self) -> str | None:
         if len(self.words) == 0:
@@ -90,27 +118,31 @@ rename  rename this account
 pwned   check current password (via hash) against haveibeenpwned.com
 exit    returns to the top menu""")
 
-    def menu(self):
-        cmd = pl_prompt("Main menu", "exit", ["list", "add", "genpass", "chpass", "clear", "help", "pwned", "version", "exit"])
-        if cmd in ["help", 'h']:
-            self.help_main()
-        elif cmd in ["list", "l"]:
-            self.list_accounts()
-        elif cmd in ["add", 'a']:
-            self.add_account()
-        elif cmd in ["genpass", 'g']:
-            _ = self.generate_password_menu()
-        elif cmd in ["chpass", "c"]:
-            self.pl.change_master_password()
-        elif cmd in ['exit', 'e']:
-            return False
-        elif cmd in ["clear"]:
-            _ = os.system("clear")
-        elif cmd in ["pwned", "p"]:
-            self.check_all_passwords()
-        elif cmd in ["version", "v"]:
-            print(f"Passlocker version {self.pl.PASSLOCKER_VERSION}")
-        return True
+    def menu(self) -> bool:
+        main_menu = [
+            ("help", "h", self.help_main, None),
+            ("list", "l", self.list_accounts, None),
+            ("add", "a", self.add_account, None),
+            ("genpass", "g", self.generate_password_menu, None),
+            ("chpass", "c", self.pl.change_master_password, None),
+            ("exit", "e", self.exit, None),
+            ("clear", "r", self.clear, None),
+            ("pwned", "p", self.check_all_passwords, None),
+            ("version", "v", self.version, None)
+        ]
+        result = True
+        while result:
+            result = menu_prompt("Main menu", "exit", main_menu)
+        return result
+    
+    def exit(self):
+        exit()
+
+    def clear(self):
+        _ = os.system("clear")
+
+    def version(self):
+        print(f"Passlocker version {self.pl.PASSLOCKER_VERSION}")
 
     def list_accounts(self):
         filt: str = input("search filter: ")
@@ -132,109 +164,120 @@ exit    returns to the top menu""")
         self.edit_account(acc)
         
     def edit_account(self, account: Account):
-        accname = account.account
-        username = account.username
+        edit_account_menu = [
+            ("help", "h", self.help_list, None),
+            ("info", "i", self.show_info, account),
+            ("get", "g", self.get_password, account),
+            ("copy", "c", self.copy_password, account),
+            ("qrcode", "q", self.qrcode, account),
+            ("addpw", "a", self.add_password, account),
+            ("genpass", "e", self.generate_password, account),
+            ("test", "t", self.test_password, account),
+            ("del", "d", self.delete_account, account),
+            ("note", "n", self.add_note, account),
+            ("rename", "r", self.rename_account, account),
+            ("pwned", "p", self.check_pwned, account),
+            ("clear", "x", self.clear, None),
+            ("exit", "e", None, None)
+        ]
+        result = True
+        while result:
+            result = menu_prompt(f"{account.account} {account.username}", "exit", edit_account_menu)
+        return result
 
-        while True:
-            cmd = pl_prompt(f"{accname} {username}",
-                default="exit", 
-                options=["help","info","get","copy","qrcode","addpw","genpass","test","del","exit","note","rename","clear","pwned"]
-            )
-            if cmd in ["help", 'h']:
-                self.help_list()
-            elif cmd in ["info", 'i']:
-                pprint(account)
-            elif cmd in ["get", 'g']:
-                try:
-                    pw: bytes = account.get_active_password()
-                    print(Fore.RED+pw.decode('utf-8')+Style.RESET_ALL)
-                except Exception as e:
-                    print(e)
-            elif cmd in ["copy", "c"]:
-                try:
-                    pw: bytes = account.get_active_password()
-                    pyperclip.copy(pw.decode('utf-8'))
-                except Exception as e:
-                    print(e)
-            elif cmd in ["qrcode", "q"]:
-                try:
-                    pw: bytes = account.get_active_password()
-                    self.print_qrcode(pw)
-                except Exception as e:
-                    print(e)
-            elif cmd in ["addpw", 'a']:
-                new_password: str = getpass.getpass(f'Enter password for account, {accname}: ')
-                if new_password == "":
-                    return
-                account.add_password(new_password)
-                account.save()
-            elif cmd in ["genpass", "g"]:
-                generated_password: str | None = self.generate_password_menu()
-                if generated_password:
-                    account.add_password(generated_password)
-                    account.save()
-            elif cmd in ["test", "t"]:
-                pw: bytes = account.get_active_password()
-                test: str = getpass.getpass("Type in the password to test: ")
-                if pw.decode('utf-8') == test:
-                    print(Fore.GREEN+"You got it!"+Style.RESET_ALL)
-                else:
-                    print(Fore.RED+"Nope, that's not it."+Style.RESET_ALL)
-            elif cmd in ["del", 'd']:
-                confirm = pl_prompt('Delete account (yes|no)', 'no')
-                if confirm and confirm.lower() in ['yes', 'y'] :
-                    deleted = account.delete()
-                    if deleted:
-                        print(f"Account, {account.account}, deleted.")
-                        return
-                    else:
-                        print(f"Cound not delete {account.account}.")
-            elif cmd in ["note", 'n']:
-                note = input("Note: ")
-                if note and len(note) > 0:
-                    account.add_note(note)
-                    account.save()
-            elif cmd in ["rename", "r"]:
-                new_account_name: str = pl_prompt("New account name", accname)
-                if not new_account_name:
-                    continue
-                new_username: str = pl_prompt("New user name", username)
-                if not new_username:
-                    continue
-                if new_account_name == account.account and new_username == account.username:
-                    continue
-                account.change_account_name(new_account_name)
-                account.change_username(new_username)
-                account.save()
-                accname = account.account
-                username = account.username
-            elif cmd in ["pwned", "p"]:
-                
-                if account.type != "password":
-                    print(Fore.GREEN+"Everything's good."+Style.RESET_ALL)
-                else:
-                    pw: bytes = account.get_active_password()
-                    password: str = pw.decode('utf-8')
-                    if self.pl.check_pwnedpasswords(password):
-                        print(Fore.RED+"PWNED!"+Style.RESET_ALL)
-                    else:
-                        print(Fore.GREEN+"Everything's good."+Style.RESET_ALL)
-            elif cmd in ["clear"]:
-                _ = os.system("clear")
-            elif cmd in ['exit', 'e']:
+    def show_info(self, account: Account):
+        pprint(account)
+
+    def get_password(self, account: Account):
+        try:
+            pw: bytes = account.get_active_password()
+            print(Fore.RED+pw.decode('utf-8')+Style.RESET_ALL)
+        except Exception as e:
+            print(e)
+
+    def copy_password(self, account: Account):
+        try:
+            pw: bytes = account.get_active_password()
+            pyperclip.copy(pw.decode('utf-8'))
+        except Exception as e:
+            print(e)
+
+    def qrcode(self, account: Account):
+        try:
+            pw: bytes = account.get_active_password()
+            self.print_qrcode(pw.decode('utf-8'))
+        except Exception as e:
+            print(e)
+
+    def add_password(self, account: Account):
+        new_password: str = getpass.getpass(f'Enter password for account, {account.account}: ')
+        if new_password == "":
+            return
+        account.add_password(new_password)
+        account.save()
+
+    def generate_password(self, account: Account):
+        generated_password: str | None = self.generate_password_menu()
+        if generated_password:
+            account.add_password(generated_password)
+            account.save()
+
+    def test_password(self, account: Account):
+        pw: bytes = account.get_active_password()
+        test: str = getpass.getpass("Type in the password to test: ")
+        if pw.decode('utf-8') == test:
+            print(Fore.GREEN+"You got it!"+Style.RESET_ALL)
+        else:
+            print(Fore.RED+"Nope, that's not it."+Style.RESET_ALL)
+
+    def delete_account(self, account: Account):
+        confirm = pl_prompt('Delete account (yes|no)', 'no')
+        if confirm and confirm.lower() in ['yes', 'y'] :
+            deleted = account.delete()
+            if deleted:
+                print(f"Account, {account.account}, deleted.")
                 return
+            else:
+                print(f"Cound not delete {account.account}.")
+
+    def add_note(self, account: Account):
+        note = input("Note: ")
+        if note and len(note) > 0:
+            account.add_note(note)
+            account.save()
+
+    def rename_account(self, account: Account):
+        new_account_name: str = pl_prompt("New account name", account.account)
+        if not new_account_name:
+            return
+        new_username: str = pl_prompt("New user name", account.username)
+        if not new_username:
+            return
+        if new_account_name == account.account and new_username == account.username:
+            return
+        account.change_account_name(new_account_name)
+        account.change_username(new_username)
+        account.save()
+
+    def check_pwned(self, account: Account):
+        if account.type != "password":
+            print(Fore.GREEN+"I can only check password accounts."+Style.RESET_ALL)
+        else:
+            pw: bytes = account.get_active_password()
+            password: str = pw.decode('utf-8')
+            if self.pl.check_pwnedpasswords(password):
+                print(Fore.RED+"PWNED!"+Style.RESET_ALL)
+            else:
+                print(Fore.GREEN+"Everything's good."+Style.RESET_ALL)
             
     def add_account(self):
         try:
-            acctype = pl_prompt("Which account type?", "password", ["password", "otp", "totp"])
-            if acctype in ["password", "pw", "p"]:
-                self.add_password_account()
-            elif acctype == "otp":
-                self.add_otp_account()
-            elif acctype == "totp":
-                self.add_totp_account()
-            else:
-                return
+            add_account_menu = [
+                ("password", "p", self.add_password_account, None),
+                ("otp", "o", self.add_otp_account, None),
+                ("totp", "t", self.add_totp_account, None)
+            ]
+            menu_prompt("Whick account type?", "password", add_account_menu)
         except Exception as e:
             #traceback.print_exc(file=sys.stdout)
             print(e)
@@ -338,13 +381,28 @@ exit    returns to the top menu""")
 
     def generate_password_menu(self) -> str | None:
         gentype: str = pl_prompt("Password type", "memorable", ["memorable", "random", "numbers"])
-        length: int = pl_prompt_int("Length", 12)
+        subtype: str = ""
+        length = min_length = max_length = 0
+        if gentype == "memorable":
+            subtype = pl_prompt("Memorable type", "words", ["words", "phrase", "leet", "leetphrase"])
+            min_length: int = pl_prompt_int("Min length", 12)
+            max_length: int = pl_prompt_int("Max length", 33)
+        else:
+            length: int = pl_prompt_int("Length", 12)
+
         count: int = pl_prompt_int("How many passwords?", 1)
+
         while True:
             passwords: list[str] = []
             for idx in range(count):
-                if gentype == "memorable":
-                    password = self.generate_memorable(length)
+                if subtype == "words":
+                    password = self.generate_words_password(min_length, max_length)
+                elif subtype == "phrase":
+                    password = self.generate_passphrase(min_length, max_length)
+                elif subtype == "leet":
+                    password = self.generate_leet(min_length, max_length)
+                elif subtype == "leetphrase":
+                    password = self.generate_leet_passphrase(min_length, max_length)
                 elif gentype == "random":
                     password = self.generate_random(length)
                 elif gentype == "numbers":
@@ -365,34 +423,116 @@ exit    returns to the top menu""")
                 else:
                     return passwords[idx]
 
-    def generate_memorable(self, length: int) -> str:
+    def generate_words_password(self, min_length: int, max_length: int) -> str:
+        length: int = random.randint(min_length, max_length)
         if length <= 8:
             maxnum = 100
             special = 0
+            num_words = 1
         elif length <= 16:
             maxnum = 1000
             special = 1
+            num_words = 1
         elif length <= 24:
             maxnum = 10000
             special = 2
+            num_words = 2
         else:
             maxnum = 100000
             special = 3
-            
+            num_words = length // 9
+
         random_int: int = secrets.randbelow(maxnum)
         random_special: LiteralString = ''.join(secrets.choice(['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '+', '=', '{', '}', '[', ']', ':', ';', '<', '>', '.', ',', '?', '/', '~', '`']) for i in range(special))
         
         secret_sauce: str = '%d%s' % (random_int, random_special)
         password: str = ""
         
-        with open('/usr/share/dict/words') as f:
-            words: list[str] = [word.strip() for word in f]
-            genlen = 0
-            while genlen != length:
-                password = secret_sauce.join(secrets.choice(words) for i in range(2))
-                genlen: int = len(password)
+        words: list[str] = self.get_dictionary()
+        genlen = 0
+        while genlen != length:
+            ws: list[str] = [secrets.choice(words).capitalize() for i in range(num_words)]
+            password = "".join(ws)+str(random_int)+secret_sauce
+            genlen: int = len(password)
                 
         return password
+
+    def generate_passphrase(self, min_length: int, max_length: int) -> str:
+        words: list[str] = self.get_dictionary()
+        genlen: int = 0
+        password: str = ""
+        if min_length < 12:
+            raise Exception("Cannot generate a passphrase with length < 12")
+        length: int = random.randint(min_length, max_length)
+        num_words = (length // 10) + 1
+        while genlen != length:
+            ws: list[str] = [secrets.choice(words).lower() for i in range(num_words)]
+            password = "-".join(ws)
+            genlen = len(password)
+        return password
+
+    def make_leet(self, string: str) -> str:
+        leet_map = {
+            'A': ['4', '/\\'],
+            'a': ['@'],
+            'B': ['8', '13', '|3'],
+            'C': ['('],
+            'D': ['17', '|)'],
+            'e': ['3'],
+            'F': ['|='],
+            'G': ['6', 'C-'],
+            'H': ['#', '/-/', '|-|'],
+            'I': ['1','|'],
+            'i': ['!'],
+            'K': ['|<'],
+            'L': ['|_'],
+            'M': ['/\\/\\'],
+            'm': ['nn'],
+            'N': ['|V'],
+            'O': ['0', '()'],
+            'P': ['|*', '9', '|>'],
+            'q': ['9'],
+            'r': ['/^'],
+            'R': ['P\\'],
+            'S': ['5', '$'],
+            's': ['$'],
+            'T': ['7'],
+            't': ['+'],
+            'U': ['V', '(_)'],
+            'V': ['\\/'],
+            'W': ['VV', '\\/\\/'],
+            'w': ['vv'],
+            'X': ['><'],
+            'Y': ['`/'],
+            'Z': ['2', '7_', '%']
+        }
+        # select about half the characters (uniqued) from the input
+        candidates: list[str] = random.choices(
+            list(set(string)),
+            k = len(list(set(string)))//2
+        )
+        # if the character has a leet replacement, pick 1 of the replacements at random and use it to replace every instance of the character
+        for c in candidates:
+            if c in leet_map:
+                repl = secrets.choice(leet_map[c])
+                string = string.replace(c, repl)
+        return string
+
+    def generate_leet(self, min_length: int, max_length: int) -> str:
+        base_password: str = self.generate_words_password(min_length, max_length)
+        return self.make_leet(base_password)
+
+    def generate_leet_passphrase(self, min_length: int, max_length: int) -> str:
+        base_password: str = self.generate_passphrase(min_length, max_length)
+        return self.make_leet(base_password)
+
+
+    def get_dictionary(self) -> list[str]:
+        if not self.dictionary:
+            with open('/usr/share/dict/words') as f:
+                words: list[str] = [word.strip() for word in f if len(word) >= 3 and word.upper() != word and not word.strip().endswith("'s")]
+                self.dictionary = words
+        return self.dictionary
         
     def generate_random(self, length:int) -> str:
         return secrets.token_urlsafe(32)[0:length]

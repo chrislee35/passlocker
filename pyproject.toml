@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "passlocker"
-version = "1.0.1"
+version = "1.0.2"
 description = "Password Encryption"
 authors = [
     { name = "Chris Lee", email = "github@chrislee.dhs.org" }
@@ -36,7 +36,7 @@ license-files = ["LICENSE"]
 Homepage = "https://github.com/chrislee35/passlocker"
 
 [tool.setuptools]
-packages = ["passlocker"]
+packages = { find = {} }
 
 [project.scripts]
 passlocker = "passlocker.cui:main"
