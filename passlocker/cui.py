@@ -165,21 +165,23 @@ exit    returns to the top menu""")
         
     def edit_account(self, account: Account):
         edit_account_menu = [
-            ("help", "h", self.help_list, None),
-            ("info", "i", self.show_info, account),
-            ("get", "g", self.get_password, account),
-            ("copy", "c", self.copy_password, account),
-            ("qrcode", "q", self.qrcode, account),
-            ("addpw", "a", self.add_password, account),
+            ("help",    "h", self.help_list, None),
+            ("info",    "i", self.show_info, account),
+            ("get",     "g", self.get_password, account),
+            ("copy",    "c", self.copy_password, account),
+            ("qrcode",  "q", self.qrcode, account),
+            ("addpw",   "a", self.add_password, account),
             ("genpass", "e", self.generate_password, account),
-            ("test", "t", self.test_password, account),
-            ("del", "d", self.delete_account, account),
-            ("note", "n", self.add_note, account),
-            ("rename", "r", self.rename_account, account),
-            ("pwned", "p", self.check_pwned, account),
-            ("clear", "x", self.clear, None),
-            ("exit", "e", None, None)
+            ("test",    "t", self.test_password, account),
+            ("del",     "d", self.delete_account, account),
+            ("note",    "n", self.add_note, account),
+            ("rename",  "r", self.rename_account, account),
+            ("pwned",   "p", self.check_pwned, account),
+            ("clear",   "l", self.clear, None),
+            ("exit",    "x", None, None)
         ]
+        if account.type == 'totp':
+            edit_account_menu.append(("export", ">", self.export_totp, account))
         result = True
         while result:
             result = menu_prompt(f"{account.account} {account.username}", "exit", edit_account_menu)
@@ -353,6 +355,14 @@ exit    returns to the top menu""")
         acc.save()
             
         self.edit_account(acc)
+
+    def export_totp(self, account: Account):
+        account.type = "password"
+        code: bytes = account.get_active_password()
+        account.type = "totp"
+        b32code: bytes = code.decode('utf-8')
+        otpauth_url = f"otpauth://totp/{account.account}:{account.username}?secret={b32code}&issuer={account.account}&algorithm={account.totp_hash_algorithm}&digits={account.totp_num_digits}&period={account.totp_time_interval}"
+        print(otpauth_url)
 
     def del_account(self):
         accname = self.next_word() or pl_prompt("Account name?")
