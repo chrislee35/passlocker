@@ -363,6 +363,7 @@ exit    returns to the top menu""")
         b32code: bytes = code.decode('utf-8')
         otpauth_url = f"otpauth://totp/{account.account}:{account.username}?secret={b32code}&issuer={account.account}&algorithm={account.totp_hash_algorithm}&digits={account.totp_num_digits}&period={account.totp_time_interval}"
         print(otpauth_url)
+        self.print_qrcode(otpauth_url)
 
     def del_account(self):
         accname = self.next_word() or pl_prompt("Account name?")
